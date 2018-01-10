@@ -1,7 +1,10 @@
 from __future__ import division, unicode_literals, print_function
 
-import yaml_config as yc
+import os
 import sys
+sys.path.append(os.path.join(os.path.dirname(os.getcwd()), 'lib'))
+
+import yaml_config as yc
 from io import StringIO
 
 
