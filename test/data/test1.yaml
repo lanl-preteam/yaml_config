@@ -10,7 +10,7 @@ quality: 0.5
 # POTENTIAL_NAMES(list): What you could name this pet.
 potential_names:
 # (str): Such as Fido.
-- "Tippy Toe"
+- Tippy Toe
 - "Ralph"
 # PROPERTIES(dict): Pet properties
 properties:

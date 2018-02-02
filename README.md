@@ -1,21 +1,23 @@
-"""YamlConfig is a set of utilities for strictly describing a YAML configuration file,
-loading it, and validating that the contents conform to the description. It is also
-capable of taking the description and automatically producing an example configuration
+# YamlConfig
+
+YamlConfig is a set of utilities for strictly describing a YAML configuration file, 
+loading it, and validating that the contents conform to the description. It is also 
+capable of taking the description and automatically producing an example configuration 
 in the specified format, complete with comments.
 
 Configuration descriptions are built much like with Object Relational Mappers (ORMs)
-for databases. Unlike databases, YAML files are expected to have nested information
+for databases. Unlike databases, YAML files are expected to have nested information 
 that makes the typical ORM syntax unsuitable. Our solution does it's best to mimick
 ORM style where possible, while still allowing for deeply nested configs.
 
 ## pyYAML
-This library uses an included, modified version of pyYAML capable of building
+This library uses an included, modified version of pyYAML capable of building 
 YAML event sequences that include comments. It is limited to working in pure python
 mode only.
 
 # Basic Usage
-YamlConfigs consist of ConfigElement() instantiations attached to
-container ConfigElement instantiations. These provide the structure
+YamlConfigs consist of ConfigElement() instantiations attached to 
+container ConfigElement instantiations. These provide the structure 
 that is used to describe, parse, and output the configuration file. These are
 all contained within a user defined subclass of YamlConfig, which is really
 just a strictly keyed dictionary ConfigElement with some extras.
@@ -32,40 +34,22 @@ just a strictly keyed dictionary ConfigElement with some extras.
             # Most types can be limited to specific choices or ranges.
             yc.StrElem('cake', default='chocolate', choices=['chocolate', 'vanilla']),
         ]
-
+        
     # Instantiate the party class. This can be reused to parse multiple configs.
     party = BirthdayPartyConfig()
     config_file = open('party.yaml')
-    try:
-        # The party object doesn't represent the data, that's returned as a
+    try: 
+        # The party object doesn't represent the data, that's returned as a 
         # special dictionary.
         party_data = party.load(config_file)
     except ValueError, KeyError, yc.RequiredError:
         print("Oh no, it's a bad party.)
-
-    # All the returned dictionaries are
+        
+    # All the returned dictionaries are 
     balloons = party_data[balloons]
     name = party_data.name
-
+    
 The above configuration description can also produce an actual configuration file:
-"""
 
-
-from . elements import *
-from . config import *
-
-__all__ = ['RequiredError',
-           'ConfigElement',
-           'ScalarElem',
-           'IntElem',
-           'IntRangeElem',
-           'FloatElem',
-           'FloatRangeElem',
-           'StrElem',
-           'ListElem',
-           'CodeElem',
-           'KeyedElem',
-           'CategoryElem',
-           'YamlConfig',
-           'ConfigDict',
-           ]
+## Further Documentation
+  
