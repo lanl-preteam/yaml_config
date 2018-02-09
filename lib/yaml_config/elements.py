@@ -502,9 +502,17 @@ class ListElem(ConfigElement):
         and single values of other types into the subtype for this list.  Subvalues are
         recursively validated against the subitem type (whose name is ignored)."""
 
-        values = self.default
-        if type(raw_values) is not self.type and raw_values is not None:
-            raw_values = [raw_values]
+        if self.default is None:
+            values = []
+        else:
+            values = self.default
+
+        if type(raw_values) is not self.type:
+            if raw_values is not None:
+                raw_values = [raw_values]
+            else:
+                raw_values = []
+
 
         for val in raw_values:
             values.append(self.sub_elem.validate(val))
@@ -664,6 +672,8 @@ class DerivedElem(ConfigElement):
 
 
 class _DictElem(ConfigElement):
+    result_dict_type = ConfigDict
+
     def __init__(self, *args, **kwargs):
         super(_DictElem, self).__init__(*args, **kwargs)
 
@@ -776,7 +786,7 @@ class KeyedElem(_DictElem):
         :raises RequiredError: When a required value is missing.
         :raises KeyError: For duplicate or malformed keys.
         """
-        out_dict = ConfigDict()
+        out_dict = self.result_dict_type()
 
         self._key_check(values)
 
@@ -862,7 +872,7 @@ class CategoryElem(_DictElem):
                                            default=defaults, required=required)
 
     def validate(self, value_dict):
-        out_dict = ConfigDict()
+        out_dict = self.result_dict_type()
 
         self._key_check(value_dict)
 

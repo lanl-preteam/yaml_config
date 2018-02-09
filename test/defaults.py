@@ -1,5 +1,6 @@
 import os
 import sys
+
 sys.path.append(os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     'lib'))
@@ -55,7 +56,13 @@ class SetDefaultTest(unittest.TestCase):
 
         data = config.validate(raw)
 
-        print(data)
+        expected_result = {'cars': [{'make': 'Dodge', 'color': 'green',
+                                     'extras': ['rhoomba', 'heated sunshades', 'flaming wheels']},
+                                    {'make': 'Honda', 'color': 'red',
+                                     'extras': ['rhoomba', 'heated sunshades', 'flaming wheels']}]}
+
+        self.assertEqual(data, expected_result)
+
 
 if __name__ == '__main__':
     unittest.main()

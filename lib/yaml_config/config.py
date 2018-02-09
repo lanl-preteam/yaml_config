@@ -17,6 +17,8 @@ class YamlConfigMixin:
 
     __metaclass__ = ABCMeta
 
+    HEADER = ""
+
     def dump(self, outfile, values=None, show_choices=True):
         """Write the configuration to the given output stream.
 
@@ -139,6 +141,7 @@ class YamlConfig(KeyedElem, YamlConfigMixin):
         last_name: Sagat
         age: 59
 
+    :cvar [str] HEADER: The documentation that should appear at the top of the config file.
     :cvar [ConfigElement] ELEMENTS: Override this with a list of element types describing your
         configuration.
     """
@@ -147,7 +150,7 @@ class YamlConfig(KeyedElem, YamlConfigMixin):
 
     def __init__(self):
         """Initialize the config."""
-        super(YamlConfig, self).__init__(elements=self.ELEMENTS)
+        super(YamlConfig, self).__init__(elements=self.ELEMENTS, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
         self.name = '<root>'
 
@@ -183,6 +186,7 @@ class CategoryYamlConfig(CategoryElem, YamlConfigMixin):
             last_name: May
             age: 54
 
+    :cvar [str] HEADER: The documentation that should appear at the top of the config file.
     :cvar ConfigElement BASE: A single ConfigElement describing what all the keys at the base
         level of this config must look like.
     """
@@ -190,7 +194,7 @@ class CategoryYamlConfig(CategoryElem, YamlConfigMixin):
     BASE = None
 
     def __init__(self):
-        super(CategoryYamlConfig, self).__init__(sub_elem=self.BASE)
+        super(CategoryYamlConfig, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
         self.name = '<root>'
 
@@ -217,6 +221,7 @@ class ListYamlConfig(ListElem, YamlConfigMixin):
         - apples
         - cantaloupe
 
+    :cvar [str] HEADER: The documentation that should appear at the top of the config file.
     :cvar ConfigElement BASE: A single ConfigElement describing what each item in the base level
         list of this config must look like.
 
@@ -225,5 +230,5 @@ class ListYamlConfig(ListElem, YamlConfigMixin):
     BASE = None
 
     def __init__(self):
-        super(ListYamlConfig, self).__init__(sub_elem=self.BASE)
+        super(ListYamlConfig, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
         self.name = '<root>'

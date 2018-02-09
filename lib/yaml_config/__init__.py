@@ -53,6 +53,7 @@ The above configuration description can also produce an actual configuration fil
 
 from . elements import *
 from . config import *
+from myyaml import YAMLError
 
 __all__ = ['RequiredError',
            'ConfigElement',
@@ -68,4 +69,5 @@ __all__ = ['RequiredError',
            'CategoryElem',
            'YamlConfig',
            'ConfigDict',
+           'YAMLError'
            ]
