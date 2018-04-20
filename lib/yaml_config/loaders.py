@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 import myyaml as yaml
 
 
-class YamlConfigMixin:
+class YamlConfigLoaderMixin:
     """Converts a ConfigElement class into a class that also knows how to load and dump the
     configuration to file. A class variable of some sort, to be overridden by the class end-user,
     is expected to hold the information to initialize the ConfigElement base. Only KeyedElem,
@@ -19,14 +19,16 @@ class YamlConfigMixin:
 
     HEADER = ""
 
-    def dump(self, outfile, values=None, show_choices=True):
+    def dump(self, outfile, values=None, show_comments=True, show_choices=True):
         """Write the configuration to the given output stream.
 
         :param stream outfile: A writable stream object
         :param {} values: Write the configuration file with the given values inserted. Values
             should be a dictionary as produced by YamlConfig.load().
-        :param bool show_choices: When dumping the config file, include the choices available for
-            each item. Defaults to True.
+        :param bool show_comments: When dumping the config file, include help_text and general
+            element information as comments. Default True.
+        :param bool show_choices: When creating comments, include the choices available for
+            each item. Default True.
         """
 
         # We're recursively generating a list of pyYaml events, which will then be emitted to
@@ -34,7 +36,7 @@ class YamlConfigMixin:
         # any child elements.
         events = list()
         events.extend([yaml.StreamStartEvent(), yaml.DocumentStartEvent()])
-        events.extend(self.yaml_events(values, show_choices))
+        events.extend(self.yaml_events(values, show_comments, show_choices))
         events.extend([yaml.DocumentEndEvent(), yaml.StreamEndEvent()])
 
         yaml.emit(events, outfile)
@@ -55,9 +57,9 @@ class YamlConfigMixin:
         return self.validate(raw_data)
 
     @abstractmethod
-    def yaml_events(self, values, show_choices):
+    def yaml_events(self, values, show_comments, show_choices):
         """This is expected to be defined by the co-inherited ConfigElement type."""
-        return [values, show_choices]
+        return [values, show_comments, show_choices]
 
     @abstractmethod
     def validate(self, data):
@@ -118,7 +120,7 @@ class YamlConfigMixin:
         elem.default = value
 
 
-class YamlConfig(KeyedElem, YamlConfigMixin):
+class YamlConfigLoader(KeyedElem, YamlConfigLoaderMixin):
     """Defines a YAML config specification, where the base structure is a strictly keyed
     dictionary.
 
@@ -150,12 +152,12 @@ class YamlConfig(KeyedElem, YamlConfigMixin):
 
     def __init__(self):
         """Initialize the config."""
-        super(YamlConfig, self).__init__(elements=self.ELEMENTS, help_text=self.HEADER)
+        super(YamlConfigLoader, self).__init__(elements=self.ELEMENTS, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
         self.name = '<root>'
 
 
-class CategoryYamlConfig(CategoryElem, YamlConfigMixin):
+class CatYamlConfigLoader(CategoryElem, YamlConfigLoaderMixin):
     """This is just like YamlConfig, except instead of giving a list of elements to use as
     strict keys in a KeyedElem, we get a single BASE to use as the type for each sub-element in a
     CategoryElem.
@@ -194,16 +196,12 @@ class CategoryYamlConfig(CategoryElem, YamlConfigMixin):
     BASE = None
 
     def __init__(self):
-        super(CategoryYamlConfig, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
+        super(CatYamlConfigLoader, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
         self.name = '<root>'
 
 
-class Bleh(YamlConfig):
-    ELEMENTS = []
-
-
-class ListYamlConfig(ListElem, YamlConfigMixin):
+class ListYamlConfigLoader(ListElem, YamlConfigLoaderMixin):
     """A YamlConfig where the base element is a ListElem. Like normal list elements, all
     items in the list must have the same element type, described by BASE.
 
@@ -230,5 +228,5 @@ class ListYamlConfig(ListElem, YamlConfigMixin):
     BASE = None
 
     def __init__(self):
-        super(ListYamlConfig, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
+        super(ListYamlConfigLoader, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
         self.name = '<root>'

@@ -75,18 +75,23 @@ class ConfigElement:
     # We use the representer functions in this to consistently represent certain types.
     _representer = yaml.representer.SafeRepresenter()
 
-    def __init__(self, name=None, default=None, required=False, choices=None,
-                 post_validator=None, help_text=""):
+    def __init__(self, name=None, default=None, required=False, hidden=False, _sub_elem=None,
+                 choices=None, post_validator=None, help_text=""):
         """
         :param str name: The name of this configuration element. Required if this is a key in a
             KeyedElem. Will receive a descriptive default otherwise.
         :param default: The default value if no value is retrieved from a config file.
         :param bool required: When validating a config file, a RequiredError will be thrown if
             there is no value for this element. *NULL does not count as a value.*
+        :param hidden: Hidden elements are ignored when writing out the config (or example
+            configs). They can still be set by the user.
         :param list choices: A optional sequence of values that this type will accept.
         :param _post_validator post_validator: A optional post validation function for
             this element. See the Post-Validation section in the online documentation for more info.
-        :raises ValueError: May raise a value error from an invalid default.
+        :param Union[ConfigElement,None] _sub_elem: The ConfigElement contained within this one,
+            such as for ListElem definitions. Meant to be set by subclasses if needed, never the
+            user. Names are optional for all sub-elements, and will be given sane defaults.
+        :raises ValueError: May raise a value error for invalid configuration options.
         """
 
         if name is not None:
@@ -94,11 +99,12 @@ class ConfigElement:
 
         self.name = name
 
-        # A value for this item is required
+        self.hidden = hidden
+        if self.hidden and (self.default is None and self.required):
+            raise ValueError("You must set a default for required, hidden Config Elements.")
+
         self.required = required
-        # What values this configuration item may take. None means unlimited.
         self._choices = choices
-        # Help text for internal and example configuration files.
         self.help_text = help_text
 
         # Run this validator on the field data (and all data at this level and lower) when
@@ -116,6 +122,30 @@ class ConfigElement:
         if default is not None:
             self.default = default
 
+        # Several ConfigElement types have a sub_elem. This adds an empty one at the top level
+        # so we can have methods that work with it at this level too.
+        if _sub_elem is not None and not isinstance(_sub_elem, ConfigElement):
+            raise ValueError("Sub-elements must be a config element of some kind. Got: {}"
+                             .format(_sub_elem))
+        self._sub_elem = _sub_elem
+
+        # Set the sub-element names if needed.
+        self._set_sub_elem_names()
+
+    def _set_sub_elem_names(self):
+        """Names are optional for sub-elements. If one isn't given, this sets a reasonable default
+        so that we can tell where errors came from."""
+
+        # We can't set names on the sub_elem if we have neither
+        if self._sub_elem is None or self.name is None:
+            return
+
+        # The * isn't a super obvious, but it matches the 'find' syntax.
+        if self._sub_elem.name is None:
+            self._sub_elem.name = '{}.*'.format(self.name)
+
+        # Recursively set names on sub-elements of sub-elements.
+        self._sub_elem._set_sub_elem_names()
 
     def _check_range(self, value):
         """Make sure the value is in the given list of choices. Throws a ValueError if not.
@@ -224,9 +254,10 @@ class ConfigElement:
 
         raise NotImplementedError("Implemented by individual elements.")
 
-    def yaml_events(self, value, show_choices):
+    def yaml_events(self, value, show_comments, show_choices):
         """Returns the yaml events to represent this config item.
             :param value: The value of this config element. May be None.
+            :param show_comments: Whether or not to include comments.
             :param show_choices: Whether or not to show the choices string in the comments.
         """
 
@@ -291,6 +322,9 @@ class ConfigElement:
 
 
 class ScalarElem(ConfigElement):
+    def __init__(self, name=None, **kwargs):
+        super(ScalarElem, self).__init__(name=name, _sub_elem=None, **kwargs)
+
     def _represent(self, value):
         """ We use the built in yaml representation system to 'serialize' scalars.
         :returns (value, tag)"""
@@ -298,7 +332,7 @@ class ScalarElem(ConfigElement):
         node = self._representer.represent_data(value)
         return node.value, node.tag
 
-    def yaml_events(self, value, show_choices):
+    def yaml_events(self, value, show_comments, show_choices):
         # Get our serialized representation of value, and return it as a ScalarEvent.
         tag = None
         if value is not None:
@@ -331,18 +365,12 @@ class FloatElem(ScalarElem):
 
 class RangeElem(ScalarElem):
 
-    def __init__(self, name=None, default=None, required=True, vmin=None, vmax=None,
-                 post_validator=None, help_text=""):
+    def __init__(self, name=None, vmin=None, vmax=None, **kwargs):
         """
         :param vmin: The minimum value for this element, inclusive.
         :param vmax: The max value, inclusive.
         """
-        super(RangeElem, self).__init__(name=name,
-                                        default=default,
-                                        required=required,
-                                        choices=[vmin, vmax],
-                                        post_validator=post_validator,
-                                        help_text=help_text)
+        super(RangeElem, self).__init__(name=name, choices=[vmin, vmax], **kwargs)
 
     def _choices_doc(self):
         if self._choices == (None, None):
@@ -391,25 +419,22 @@ class StrElem(ScalarElem):
 class RegexElem(StrElem):
     """Just like a string item, but validates against a regex."""
 
-    def __init__(self, name=None, default=None, regex='', post_validator=None, help_text=""):
+    def __init__(self, name=None, regex='', **kwargs):
         """
         :param regex: A regular expression string to match against.
         """
 
-        super(RegexElem, self).__init__(name, default=default,
-                                        post_validator=post_validator,
-                                        help_text=help_text)
+        super(RegexElem, self).__init__(name=name, choices=[regex], **kwargs)
         self.regex = re.compile(regex)
-        self.choices = [regex]
 
     def _check_range(self, value):
         if self.regex.match(value) is None:
             raise ValueError("Value {} does not match regex '{}' for {} called '{}'".format(
-                value, self.choices[0], self.__class__.__name__, self.name
+                value, self._choices[0], self.__class__.__name__, self.name
             ))
 
     def _choices_doc(self):
-        return "Values must match: r'{regex}'".format(regex=self.choices[0])
+        return "Values must match: r'{regex}'".format(regex=self._choices[0])
 
 
 class ListElem(ConfigElement):
@@ -440,8 +465,8 @@ class ListElem(ConfigElement):
     type = list
     type_name = 'list of items'
 
-    def __init__(self, name=None, sub_elem=None, min_length=0, max_length=None,
-                 required=False, post_validator=None, defaults=None, help_text=""):
+    def __init__(self, name=None, sub_elem=None, min_length=0, max_length=None, defaults=None,
+                 **kwargs):
         """
         :param sub_elem: A ConfigItem that each item in the list must conform to.
         :param min_length: The minimum number of items allowed, inclusive. Default: 0
@@ -454,37 +479,12 @@ class ListElem(ConfigElement):
         if defaults is None:
             defaults = []
 
-        if not isinstance(sub_elem, ConfigElement):
-            raise ValueError("Subtype must be a config element of some kind. Got: {}"
-                             .format(sub_elem))
-        self.sub_elem = sub_elem
-
         if min_length < 0:
             raise ValueError("min_length must be a positive integer.")
         self.min_length = min_length
         self.max_length = max_length
 
-        super(ListElem, self).__init__(name,
-                                       default=defaults,
-                                       required=required,
-                                       post_validator=post_validator,
-                                       help_text=help_text)
-
-        # Set the name of the subtype if we know the name of this element.
-        if self.name is not None:
-            self._set_names()
-
-    def _set_names(self):
-        """List elements generally don't have names, but we force them for easier debugging.
-        Unfortunately, the name of a list won't be known until we get to a containing
-        mapping/dict, so we use this function to walk back up."""
-
-        if self.sub_elem.name is None:
-            self.sub_elem.name = '{}.list_item'.format(self.name)
-
-        # Make sure names get set on the sublist, if the subtype is a ListElem
-        if isinstance(self.sub_elem, ListElem):
-            self.sub_elem._set_names()
+        super(ListElem, self).__init__(name=name, _sub_elem=sub_elem, default=defaults, **kwargs)
 
     def _check_range(self, value):
         """Make sure our list is within the appropriate length range."""
@@ -513,9 +513,8 @@ class ListElem(ConfigElement):
             else:
                 raw_values = []
 
-
         for val in raw_values:
-            values.append(self.sub_elem.validate(val))
+            values.append(self._sub_elem.validate(val))
 
         if not self._check_range(values):
             raise ValueError("Expected [{}-{}] list items for {} field {}, got {}.".format(
@@ -527,7 +526,7 @@ class ListElem(ConfigElement):
             ))
 
         for i in range(len(values)):
-            values[i] = self._run_post_validator(self.sub_elem, values, values[i])
+            values[i] = self._run_post_validator(self._sub_elem, values, values[i])
 
         return values
 
@@ -550,9 +549,9 @@ class ListElem(ConfigElement):
                                "sub-element isn't named. Got '{}' from '{}' instead."
                                .format(self.__class__.__name__, self.name, key, dotted_key))
 
-            return self.sub_elem.find(next_key)
+            return self._sub_elem.find(next_key)
 
-    def yaml_events(self, value, show_choices):
+    def yaml_events(self, value, show_comments, show_choices):
         events = list()
         events.append(yaml.SequenceStartEvent(
             anchor=None,
@@ -561,15 +560,16 @@ class ListElem(ConfigElement):
             flow_style=False,
         ))
 
-        comment = self.sub_elem.make_comment(show_choices, show_name=False)
-        events.append(yaml.CommentEvent(value=comment))
+        if show_comments:
+            comment = self._sub_elem.make_comment(show_choices, show_name=False)
+            events.append(yaml.CommentEvent(value=comment))
 
         if value is not None:
             # Value is expected to be a list of items at this point.
             for v in value:
-                events.extend(self.sub_elem.yaml_events(v, show_choices=show_choices))
+                events.extend(self._sub_elem.yaml_events(v, show_comments, show_choices))
         else:
-            events.extend(self.sub_elem.yaml_events(None, show_choices))
+            events.extend(self._sub_elem.yaml_events(None, show_comments, show_choices))
 
         events.append(yaml.SequenceEndEvent())
         return events
@@ -582,7 +582,8 @@ class ListElem(ConfigElement):
             if item not in merged:
                 merged.append(item)
 
-#TODO: Make this worthwhile
+
+# TODO: Make this worthwhile
 class CodeElem(ListElem):
     """Like a list config item, except the subtype is always string, and the
     subitems are considered to be a single group. Useful for config sections that are
@@ -590,12 +591,12 @@ class CodeElem(ListElem):
     type = list
     type_name = 'code block'
 
-    def __init__(self, name=None, help_text=""):
-        subtype = StrElem('code_line')
-        super(CodeElem, self).__init__(name, sub_elem=subtype, help_text=help_text)
+    def __init__(self, name=None, **kwargs):
+        subtype = StrElem(name='code_line')
+        super(CodeElem, self).__init__(name, sub_elem=subtype, **kwargs)
 
     def validate(self, lines):
-        lines = [self.sub_elem.validate(line) for line in lines if line is not None]
+        lines = [self._sub_elem.validate(line) for line in lines if line is not None]
 
         code_block = '\n'.join(lines).strip()
         if not code_block.endswith('\n'):
@@ -615,14 +616,14 @@ class CodeElem(ListElem):
         # except Exception as err:
         #   raise ValueError(err)
 
-    def yaml_events(self, value, show_choices):
+    def yaml_events(self, value, show_comments, show_choices):
         """Treat each line a separate list element."""
 
         if value is not None:
             lines = value.split('\n')
         else:
             lines = None
-        return super(CodeElem, self).yaml_events(lines, show_choices)
+        return super(CodeElem, self).yaml_events(lines, show_comments, show_choices)
 
 
 class DerivedElem(ConfigElement):
@@ -642,15 +643,13 @@ class DerivedElem(ConfigElement):
     validated values from the KeyedElem so far.
     """
 
-    def __init__(self, name, resolver=None, post_validator=None, help_text=""):
+    def __init__(self, name, resolver=None, **kwargs):
         if name is None:
             raise ValueError("Derived Elements must be named.")
 
         if resolver is not None:
             self.resolve = resolver
-        super(DerivedElem, self).__init__(name=name,
-                                          post_validator=post_validator,
-                                          help_text=help_text)
+        super(DerivedElem, self).__init__(name=name, _sub_elem=None, **kwargs)
 
     def resolve(self, siblings):
         """A resolver function gets a dictionary of its returned sibling's values, and should return
@@ -663,7 +662,14 @@ class DerivedElem(ConfigElement):
         """
         return None
 
-    def yaml_events(self, value, show_choices):
+    def find(self, dotted_key):
+        if dotted_key != '':
+            raise ValueError("Invalid key '{0}' for {1} called '{2}'. Since {1} don't have"
+                             "sub-elements, the key must be '' by this point."
+                             .format(dotted_key, self.__class__.__name__, self.name))
+        return self
+
+    def yaml_events(self, value, show_comments, show_choices):
         """Derived elements are never written to file."""
         return []
 
@@ -676,6 +682,9 @@ class _DictElem(ConfigElement):
 
     def __init__(self, *args, **kwargs):
         super(_DictElem, self).__init__(*args, **kwargs)
+
+    def find(self, value):
+        raise NotImplementedError
 
     def validate(self, value):
         raise NotImplementedError
@@ -702,9 +711,6 @@ class _DictElem(ConfigElement):
                                "insensitive)."
                                .format(k_list, self.__class__.__name__, self.name))
 
-    def find(self, dotted_key):
-        raise NotImplementedError()
-
 
 class KeyedElem(_DictElem):
     """A dictionary configuration item with predefined keys that may have non-uniform types. The
@@ -712,17 +718,13 @@ class KeyedElem(_DictElem):
 
     type = dict
 
-    def __init__(self, name=None, elements=list(), post_validator=None,
-                 help_text="", required=False):
+    def __init__(self, name=None, elements=list(), **kwargs):
         """
         :param elements: This list of config elements is also forms the list of accepted keys,
                          with the element.name being the key.
         """
 
-        super(KeyedElem, self).__init__(name,
-                                        post_validator=post_validator,
-                                        help_text=help_text,
-                                        required=required)
+        super(KeyedElem, self).__init__(name, **kwargs)
 
         self.config_elems = OrderedDict()
 
@@ -769,12 +771,6 @@ class KeyedElem(_DictElem):
 
     find.__doc__ = ConfigElement.find.__doc__
 
-    def merge(self, old, new):
-        for key, value in new.items():
-            elem = self.config_elems[key]
-            old[key] = elem.merge(old[key], new[key])
-        return old
-
     def validate(self, values):
         """Ensure the given values conform to the config specification. Also adds any
         derived element values.
@@ -815,7 +811,7 @@ class KeyedElem(_DictElem):
 
         return out_dict
 
-    def yaml_events(self, values, show_choices):
+    def yaml_events(self, values, show_comments, show_choices):
         if values is None:
             values = dict()
 
@@ -827,8 +823,10 @@ class KeyedElem(_DictElem):
                 continue
 
             value = values.get(key, None)
-            comment = elem.make_comment(show_choices)
-            events.append(yaml.CommentEvent(value=comment))
+            if show_comments:
+                comment = elem.make_comment(show_choices)
+                events.append(yaml.CommentEvent(value=comment))
+
             # Add the mapping key
             events.append(yaml.ScalarEvent(value=key, anchor=None,
                                            tag=None, implicit=(True, True)))
@@ -845,8 +843,7 @@ class CategoryElem(_DictElem):
 
     type = dict
 
-    def __init__(self, name=None, sub_elem=None, choices=None, defaults=None,
-                 required=False, help_text=""):
+    def __init__(self, name=None, sub_elem=None, defaults=None, **kwargs):
         """
         :param name: The name of this Config Element
         :param sub_elem: The type all keys in this mapping must conform to.
@@ -866,31 +863,43 @@ class CategoryElem(_DictElem):
             raise ValueError("Using a derived element as the sub-element in a CategoryElem "
                              "does not make sense.")
 
-        self.sub_elem = sub_elem
+        self._sub_elem = sub_elem
 
-        super(CategoryElem, self).__init__(name, choices=choices, help_text=help_text,
-                                           default=defaults, required=required)
+        super(CategoryElem, self).__init__(name, _sub_elem=sub_elem, default=defaults, **kwargs)
 
     def validate(self, value_dict):
         out_dict = self.result_dict_type()
 
+        # Make sure the keys are sane
         self._key_check(value_dict)
+
+        # Pre-fill our output dictionary with hard coded defaults.
+        if self._default is not None:
+            for key, value in self._default:
+                out_dict[key] = value
 
         for key, value in value_dict.items():
             key = key.lower()
             if self._choices is not None and key not in self._choices:
                 raise ValueError("Invalid key for {} called {}. '{}' not in given choices.")
-            out_dict[key] = self.sub_elem.validate(value)
 
-        # Use the default dictionary to
-        for key, value in self._default:
-            if key not in out_dict:
-                out_dict[key] = self.sub_elem.validate(value)
+            validated_value = self._sub_elem.validate(value)
+            # Merge the validated values with the defaults from the hard coded defaults
+            # if present.
+            if key in out_dict:
+                out_dict[key] = self._sub_elem.merge(out_dict[key], validated_value)
+            else:
+                out_dict[key] = validated_value
 
         for key, value in out_dict.items():
-            out_dict[key] = self._run_post_validator(self.sub_elem, out_dict, value)
+            out_dict[key] = self._run_post_validator(self._sub_elem, out_dict, value)
 
         return out_dict
+
+    def merge(self, old, new):
+        for key, value in new.items():
+            old[key] = self._sub_elem.merge(old[key], new[key])
+        return old
 
     def find(self, dotted_key):
         if dotted_key == '':
@@ -905,23 +914,107 @@ class CategoryElem(_DictElem):
                                "sub-element isn't named. Got '{}' from '{}' instead."
                                .format(self.__class__.__name__, self.name, key, dotted_key))
 
-            return self.sub_elem.find(next_key)
+            return self._sub_elem.find(next_key)
 
-    def yaml_events(self, values, show_choices):
+    def yaml_events(self, values, show_comments, show_choices):
         """Create a mapping event list, based on the values given."""
         if values is None:
             values = dict()
 
         events = list()
         events.append(yaml.MappingStartEvent(anchor=None, tag=None, implicit=True))
-        comment = self.sub_elem.make_comment(show_choices, show_name=False)
-        events.append(yaml.CommentEvent(value=comment))
+        if show_comments:
+            comment = self._sub_elem.make_comment(show_choices, show_name=False)
+            events.append(yaml.CommentEvent(value=comment))
         if values:
             for key, value in values.items():
                 # Add the mapping key.
                 events.append(yaml.ScalarEvent(value=self.name, anchor=None,
                                                tag=None, implicit=(True, True)))
                 # Add the mapping value.
-                events.extend(self.sub_elem.yaml_events(value, show_choices))
+                events.extend(self._sub_elem.yaml_events(value, show_comments, show_choices))
         events.append(yaml.MappingEndEvent())
         return events
+
+
+class DefaultedCategoryElem(CategoryElem):
+    """This allows you to create a category with user defined defaults. It's essentially a
+    category element with a KeyedElem as the sub-element. If the '__default__' key is
+    present, values from that dict act as defaults for the others. The elements of the
+    '_' key are all considered optional, regardless of whether they are
+    marked as required or not.
+
+    Example: ::
+
+        import yaml_config as yc
+
+        cars = yc.DefaultedElement(elements=[
+            yc.IntElem('wheels', required=True),
+            yc.StrElem('drivetrain', required=True, default='2WD'),
+            yc.StrElem('color')
+        ]
+
+        results = cars.validate({
+            '__default__': {
+                'wheels': 4,
+                'color': 'red'},
+            'jeep': {
+                'color': 'blue',
+                'drivetrain': '4WD'},
+            'reliant_robin': {
+                'wheels': 3}
+            })
+
+        print('Should print 4: ', results.jeep.wheels)
+    """
+
+    def __init__(self, name=None, elements=None, default_key='_', **kwargs):
+        """
+        :param elements: A list of ConfigElement instances, just like for a KeyedElem.
+        :param default_key: The key to use for default values.
+        """
+        self.default_key = default_key
+
+        super(DefaultedCategoryElem, self).__init__(name=name,
+                                                    sub_elem=KeyedElem(elements),
+                                                    **kwargs)
+
+    def validate(self, value_dict):
+        out_dict = self.result_dict_type()
+
+        # Make sure the keys are sane
+        self._key_check(value_dict)
+
+        defaults = {}
+        if self.default_key in value_dict:
+            defaults = value_dict[self.default_key]
+            del value_dict[self.default_key]
+
+        # Prefill our output dictionary with hard coded defaults.
+        if self._default is not None:
+            for key, value in self._default:
+                out_dict[key] = value
+
+        for key, base_value in value_dict.items():
+            key = key.lower()
+            if self._choices is not None and key not in self._choices:
+                raise ValueError("Invalid key for {} called {}. '{}' not in given choices.")
+
+            # Use the defaults from self.DEFAULT_KEY as the base for each value.
+            value = defaults.copy()
+            # We know our sub-element is a dict in this case.
+            value.update(base_value)
+            validated_value = self._sub_elem.validate(value)
+            # Merge the validated values with the defaults from the hard coded defaults
+            # if present.
+            if key in out_dict:
+                out_dict[key] = self._sub_elem.merge(out_dict[key], validated_value)
+            else:
+                out_dict[key] = validated_value
+
+        for key, value in out_dict.items():
+            out_dict[key] = self._run_post_validator(self._sub_elem, out_dict, value)
+
+        return out_dict
+
+
