@@ -12,7 +12,7 @@ import unittest
 
 class SetDefaultTest(unittest.TestCase):
     def test_set_default1(self):
-        class DessertConfig(yc.YamlConfig):
+        class DessertConfig(yc.YamlConfigLoader):
             ELEMENTS = [
                 yc.KeyedElem('pie', elements=[
                     yc.StrElem('fruit')
@@ -25,7 +25,7 @@ class SetDefaultTest(unittest.TestCase):
         config.set_default('pie.fruit', 'apple')
 
     def test_set_default2(self):
-        class Config2(yc.YamlConfig):
+        class Config2(yc.YamlConfigLoader):
             ELEMENTS = [
                 yc.ListElem('cars', sub_elem=yc.KeyedElem(elements=[
                     yc.StrElem('color'),

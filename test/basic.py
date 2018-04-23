@@ -20,7 +20,7 @@ import unittest
 
 class BasicTest(unittest.TestCase):
     def setUp(self):
-        class TestConfig(yc.YamlConfig):
+        class TestConfig(yc.YamlConfigLoader):
 
             ELEMENTS = [
                 yc.StrElem("pet", default="squirrel", required=True, choices=["squirrel",
