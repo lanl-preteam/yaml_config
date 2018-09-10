@@ -1,12 +1,13 @@
 from __future__ import print_function, division, unicode_literals
 
+import inspect
 import re
 from abc import ABCMeta
 from collections import OrderedDict, defaultdict
 
 # A modified pyyaml library
-import myyaml as yaml
-from myyaml import representer
+import yaml
+from yaml import representer
 
 
 # This module defines a set of constructs for strictly defining configuration objects that get
@@ -124,9 +125,15 @@ class ConfigElement:
 
         # Several ConfigElement types have a sub_elem. This adds an empty one at the top level
         # so we can have methods that work with it at this level too.
-        if _sub_elem is not None and not isinstance(_sub_elem, ConfigElement):
-            raise ValueError("Sub-elements must be a config element of some kind. Got: {}"
-                             .format(_sub_elem))
+        if _sub_elem is not None:
+            if inspect.isclass(_sub_elem):
+                raise ValueError("Sub-element of '{0}' must be a Config Element instance of "
+                                 "some kind. Got a class instead: {1}"
+                                 .format(self.name if self.name is not None else self, _sub_elem))
+            elif not isinstance(_sub_elem, ConfigElement):
+                raise ValueError("Sub-elements must be a config element of some kind. Got: {}"
+                                 .format(_sub_elem))
+
         self._sub_elem = _sub_elem
 
         # Set the sub-element names if needed.
@@ -856,10 +863,7 @@ class CategoryElem(_DictElem):
         if defaults is None:
             defaults = dict()
 
-        if not isinstance(sub_elem, ConfigElement):
-            raise ValueError("Sub-element must be a config element of some kind. Got: {}"
-                             .format(sub_elem))
-        elif isinstance(sub_elem, DerivedElem):
+        if isinstance(sub_elem, DerivedElem):
             raise ValueError("Using a derived element as the sub-element in a CategoryElem "
                              "does not make sense.")
 

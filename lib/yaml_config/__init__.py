@@ -53,7 +53,8 @@ The above configuration description can also produce an actual configuration fil
 
 from . elements import *
 from . loaders import *
-from myyaml import YAMLError
+
+from yaml import YAMLError
 
 __all__ = ['RequiredError',
            'ConfigElement',

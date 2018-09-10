@@ -2,7 +2,7 @@ from . elements import KeyedElem, CategoryElem, ListElem
 
 from abc import ABCMeta, abstractmethod
 
-import myyaml as yaml
+import yaml
 
 
 class YamlConfigLoaderMixin:
