@@ -19,6 +19,9 @@ class YamlConfigLoaderMixin:
 
     HEADER = ""
 
+    # This is expected to be overridden by the main class.
+    type = None
+
     def dump(self, outfile, values=None, show_comments=True, show_choices=True):
         """Write the configuration to the given output stream.
 
@@ -55,6 +58,35 @@ class YamlConfigLoaderMixin:
         raw_data = yaml.load(infile)
 
         return self.validate(raw_data)
+
+    def load_empty(self):
+        """Get a copy of the configuration, as if we had loaded an empty file. Essentially,
+        get a configuration with just the defaults.
+
+        :returns ConfigDict: A ConfigDict of the contents of the configuration file.
+        :raises ValueError, RequiredError, KeyError: As per validate().
+        """
+
+        return self.validate(self.type())
+
+    def load_merge(self, base_data, infile):
+        """Load the data infile, merge it into base_data, and then validate the combined result.
+        :param base_data:
+        :param file info:
+        :returns ConfigDict: A ConfigDict of the contents of the configuration file.
+        :raises IOError: On stream read failures.
+        :raises YAMLError: (and child exceptions) On YAML format issues.
+        """
+
+        new_data = yaml.load(infile)
+
+        data = self.merge(base_data, new_data)
+
+        return self.validate(data)
+
+    def merge(self, old, new):
+        """This should be overridden by the element class."""
+        raise NotImplementedError
 
     @abstractmethod
     def yaml_events(self, values, show_comments, show_choices):

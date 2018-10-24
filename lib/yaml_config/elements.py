@@ -1,5 +1,6 @@
 from __future__ import print_function, division, unicode_literals
 
+import copy
 import inspect
 import re
 from abc import ABCMeta
@@ -71,7 +72,7 @@ class ConfigElement:
     _type_name = None
 
     # The regular expression that all element names are matched against.
-    _NAME_RE = re.compile(r'^[a-z][a-z0-9_]+$')
+    _NAME_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]+$')
 
     # We use the representer functions in this to consistently represent certain types.
     _representer = yaml.representer.SafeRepresenter()
@@ -79,7 +80,7 @@ class ConfigElement:
     def __init__(self, name=None, default=None, required=False, hidden=False, _sub_elem=None,
                  choices=None, post_validator=None, help_text=""):
         """
-        :param str name: The name of this configuration element. Required if this is a key in a
+        :param unicode name: The name of this configuration element. Required if this is a key in a
             KeyedElem. Will receive a descriptive default otherwise.
         :param default: The default value if no value is retrieved from a config file.
         :param bool required: When validating a config file, a RequiredError will be thrown if
@@ -169,7 +170,7 @@ class ConfigElement:
 
     @property
     def default(self):
-        return self._default
+        return copy.copy(self._default)
 
     @default.setter
     def default(self, value):
@@ -420,7 +421,7 @@ class BoolElem(ScalarElem):
 
 
 class StrElem(ScalarElem):
-    type = str
+    type = unicode
 
 
 class RegexElem(StrElem):
@@ -478,13 +479,13 @@ class ListElem(ConfigElement):
         :param sub_elem: A ConfigItem that each item in the list must conform to.
         :param min_length: The minimum number of items allowed, inclusive. Default: 0
         :param max_length: The maximum number of items allowed, inclusive. None denotes unlimited.
-        :param [] defaults: Defaults on a list are items that are prepended to the list
-            regardless of what's in a loaded config file. Duplicates are possible (just as they
-            are if the config file has duplicates).
+        :param [] defaults: Defaults on a list are items that are added to the list if no items
+            are explicitly added.
+
         """
 
         if defaults is None:
-            defaults = []
+            defaults = list()
 
         if min_length < 0:
             raise ValueError("min_length must be a positive integer.")
@@ -514,7 +515,7 @@ class ListElem(ConfigElement):
         else:
             values = self.default
 
-        if type(raw_values) is not self.type:
+        if not isinstance(raw_values, self.type):
             if raw_values is not None:
                 raw_values = [raw_values]
             else:
@@ -582,12 +583,13 @@ class ListElem(ConfigElement):
         return events
 
     def merge(self, old, new):
-        """Add any unique, new items to the list."""
-        merged = old.copy()
+        """When merging lists, a new list simply replaces the old list, unless the new list is
+        None."""
 
-        for item in new:
-            if item not in merged:
-                merged.append(item)
+        if new is None:
+            return old
+
+        return new.copy()
 
 
 # TODO: Make this worthwhile
@@ -687,8 +689,22 @@ class DerivedElem(ConfigElement):
 class _DictElem(ConfigElement):
     result_dict_type = ConfigDict
 
-    def __init__(self, *args, **kwargs):
-        super(_DictElem, self).__init__(*args, **kwargs)
+    KC_LOWER = 'lower'
+    KC_UPPER = 'upper'
+    KC_MIXED = 'mixed'
+
+    def __init__(self, key_case=None, **kwargs):
+
+        if key_case is None:
+            key_case = self.KC_LOWER
+
+        if key_case not in (self.KC_LOWER, self.KC_UPPER, self.KC_MIXED):
+            raise ValueError("Invalid key case. Expected one of <cls>.KC_LOWER, "
+                             "<cls>.KC_UPPER, <cls>.KC_MIXED")
+
+        self._key_case = key_case
+
+        super(_DictElem, self).__init__(**kwargs)
 
     def find(self, value):
         raise NotImplementedError
@@ -697,26 +713,37 @@ class _DictElem(ConfigElement):
         raise NotImplementedError
 
     def _key_check(self, values_dict):
-        """Raises a KeyError if duplicate (case-insensitive) keys are present in values_dict.
+        """Raises a KeyError if keys don't match the key regex, or there are duplicates. Keys are
+        converted to upper, lower, or left in their original case depending on 'self._key_case'.
 
         :param {} values_dict: The dictionary to check.
         """
 
+        if not isinstance(values_dict, dict):
+            raise ValueError("Invalid values ({}) for element {}".format(values_dict, self.name))
+        
         # Check for duplicate keys.
-        lowered_keys = defaultdict(lambda: [])
+        keys = defaultdict(lambda: [])
         for key in values_dict.keys():
-            key_l = key.lower()
-            lowered_keys[key_l].append(key)
+            if self._key_case is self.KC_LOWER:
+                key_mod = key.lower()
+            elif self._key_case is self.KC_UPPER:
+                key_mod = key.lower()
+            else:
+                key_mod = key
+            keys[key_mod].append(key)
 
-            if self._NAME_RE.match(key_l) is None:
-                raise KeyError("Invalid key '{}' in {} called {}. (keys must be valid python "
-                               "identifiers.".format(key_l, self.__class__.__name__, self.name))
+            if self._NAME_RE.match(key_mod) is None:
+                raise KeyError("Invalid key '{}' in {} called {}. Key does not match expected "
+                               "regular expression '{}'"
+                               .format(key_mod, self.__class__.__name__, self.name,
+                                       self._NAME_RE.pattern))
 
-        for k_list in lowered_keys.values():
+        for k_list in keys.values():
             if len(k_list) != 1:
-                raise KeyError("Duplicate keys given {} in {} called {} (keys are case "
-                               "insensitive)."
-                               .format(k_list, self.__class__.__name__, self.name))
+                raise KeyError("Duplicate keys given {} in {} called {}. (Keys in this config "
+                               "object are automatically converted to {}case."
+                               .format(k_list, self.__class__.__name__, self.name, self._key_case))
 
 
 class KeyedElem(_DictElem):
@@ -725,13 +752,15 @@ class KeyedElem(_DictElem):
 
     type = dict
 
-    def __init__(self, name=None, elements=list(), **kwargs):
+    def __init__(self, name=None, elements=list(), key_case=_DictElem.KC_LOWER, **kwargs):
         """
+        :param key_case: Must be one of the <cls>.KC_* values. Determines whether keys are
+                         automatically converted to lower or upper case, or left alone.
         :param elements: This list of config elements is also forms the list of accepted keys,
                          with the element.name being the key.
         """
 
-        super(KeyedElem, self).__init__(name, **kwargs)
+        super(KeyedElem, self).__init__(name=name, key_case=key_case, **kwargs)
 
         self.config_elems = OrderedDict()
 
@@ -791,10 +820,19 @@ class KeyedElem(_DictElem):
         """
         out_dict = self.result_dict_type()
 
+        if values is None:
+            values = {}
+
         self._key_check(values)
 
-        lowered_keys = [k.lower() for k in values.keys()]
-        unknown_keys = set(lowered_keys).difference(self.config_elems.keys())
+        if self._key_case is self.KC_LOWER:
+            given_keys = [k.lower() for k in values.keys()]
+        elif self._key_case is self.KC_UPPER:
+            given_keys = [k.lower() for k in values.keys()]
+        else:
+            given_keys = values.keys()
+
+        unknown_keys = set(given_keys).difference(self.config_elems.keys())
         if unknown_keys:
             raise KeyError("Invalid config key '{}' given under {} called '{}'."
                            .format(unknown_keys.pop(), self.__class__.__name__, self.name))
@@ -850,13 +888,16 @@ class CategoryElem(_DictElem):
 
     type = dict
 
-    def __init__(self, name=None, sub_elem=None, defaults=None, **kwargs):
+    def __init__(self, name=None, sub_elem=None, defaults=None, key_case=_DictElem.KC_LOWER,
+                 **kwargs):
         """
         :param name: The name of this Config Element
         :param sub_elem: The type all keys in this mapping must conform to.
         :param choices: The possible keys for this element. None denotes that any are valid.
         :param required: Whether this element is required.
         :param defaults: An optional dictionary of default key:value pairs.
+        :param key_case: Must be one of the <cls>.KC_* values. Determines whether keys are
+                         automatically converted to lower or upper case, or left alone.
         :param help_text: Description of the purpose and usage of this element.
         """
 
@@ -869,10 +910,14 @@ class CategoryElem(_DictElem):
 
         self._sub_elem = sub_elem
 
-        super(CategoryElem, self).__init__(name, _sub_elem=sub_elem, default=defaults, **kwargs)
+        super(CategoryElem, self).__init__(name=name, _sub_elem=sub_elem, key_case=key_case,
+                                           default=defaults, **kwargs)
 
     def validate(self, value_dict):
         out_dict = self.result_dict_type()
+
+        if value_dict is None:
+            value_dict = {}
 
         # Make sure the keys are sane
         self._key_check(value_dict)
