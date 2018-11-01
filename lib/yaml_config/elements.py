@@ -3,12 +3,18 @@ from __future__ import print_function, division, unicode_literals
 import copy
 import inspect
 import re
+import sys
 from abc import ABCMeta
 from collections import OrderedDict, defaultdict
 
 # A modified pyyaml library
 import yaml
 from yaml import representer
+
+if sys.version_info[0] == 2:
+    str_type = unicode
+else:
+    str_type = str
 
 
 # This module defines a set of constructs for strictly defining configuration objects that get
@@ -80,7 +86,7 @@ class ConfigElement:
     def __init__(self, name=None, default=None, required=False, hidden=False, _sub_elem=None,
                  choices=None, post_validator=None, help_text=""):
         """
-        :param unicode name: The name of this configuration element. Required if this is a key in a
+        :param str_type name: The name of this configuration element. Required if this is a key in a
             KeyedElem. Will receive a descriptive default otherwise.
         :param default: The default value if no value is retrieved from a config file.
         :param bool required: When validating a config file, a RequiredError will be thrown if
@@ -421,7 +427,7 @@ class BoolElem(ScalarElem):
 
 
 class StrElem(ScalarElem):
-    type = unicode
+    type = str_type
 
 
 class RegexElem(StrElem):
