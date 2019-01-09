@@ -36,6 +36,7 @@ class ConfigDict(dict):
     The following marks this class as having dynamic attributes for IDE typechecking.
     @DynamicAttrs
     """
+
     def __getattr__(self, key):
         if key in self:
             return super(ConfigDict, self).__getitem__(key)
@@ -99,6 +100,8 @@ class ConfigElement:
         :param Union[ConfigElement,None] _sub_elem: The ConfigElement contained within this one,
             such as for ListElem definitions. Meant to be set by subclasses if needed, never the
             user. Names are optional for all sub-elements, and will be given sane defaults.
+        :param ConfigElement _sub_elem: The ConfigElement instance that describes the underlying
+            types for this config item. Mostly used by sub-classes.
         :raises ValueError: May raise a value error for invalid configuration options.
         """
 
@@ -125,11 +128,6 @@ class ConfigElement:
         if self._type_name is None:
             self._type_name = self.type.__name__
 
-        # The default value gets validated through a setter function.
-        self._default = None
-        if default is not None:
-            self.default = default
-
         # Several ConfigElement types have a sub_elem. This adds an empty one at the top level
         # so we can have methods that work with it at this level too.
         if _sub_elem is not None:
@@ -145,6 +143,11 @@ class ConfigElement:
 
         # Set the sub-element names if needed.
         self._set_sub_elem_names()
+
+        # The default value gets validated through a setter function.
+        self._default = None
+        if default is not None:
+            self.default = default
 
     def _set_sub_elem_names(self):
         """Names are optional for sub-elements. If one isn't given, this sets a reasonable default
@@ -199,6 +202,10 @@ class ConfigElement:
                 elif self.required:
                     raise RequiredError("Config missing required value for {} named {}."
                                         .format(self.__class__.__name__, self.name))
+
+            # If there is no value, return no value.
+            if value is None:
+                return None
 
             try:
                 converter = self.type if self.type_converter is None else self.type_converter
