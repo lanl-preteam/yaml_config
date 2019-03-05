@@ -111,7 +111,7 @@ class ConfigElement:
         self.name = name
 
         self.hidden = hidden
-        if self.hidden and (self.default is None and self.required):
+        if self.hidden and (default is None and self.required):
             raise ValueError("You must set a default for required, hidden Config Elements.")
 
         self.required = required
@@ -773,9 +773,9 @@ class KeyedElem(_DictElem):
                          with the element.name being the key.
         """
 
-        super(KeyedElem, self).__init__(name=name, key_case=key_case, **kwargs)
-
         self.config_elems = OrderedDict()
+
+        super(KeyedElem, self).__init__(name=name, key_case=key_case, **kwargs)
 
         for i in range(len(elements)):
             elem = elements[i]
