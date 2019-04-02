@@ -765,7 +765,8 @@ class KeyedElem(_DictElem):
 
     type = dict
 
-    def __init__(self, name=None, elements=list(), key_case=_DictElem.KC_LOWER, **kwargs):
+    def __init__(self, name=None, elements=None, key_case=_DictElem.KC_LOWER,
+                 **kwargs):
         """
         :param key_case: Must be one of the <cls>.KC_* values. Determines whether keys are
                          automatically converted to lower or upper case, or left alone.
@@ -774,6 +775,9 @@ class KeyedElem(_DictElem):
         """
 
         self.config_elems = OrderedDict()
+
+        if elements is None:
+            elements = []
 
         super(KeyedElem, self).__init__(name=name, key_case=key_case, **kwargs)
 
