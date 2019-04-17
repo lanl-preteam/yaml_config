@@ -50,6 +50,17 @@ class ConfigDict(dict):
             super(ConfigDict, self).__setattr__(key, value)
 
 
+class NullList(list):
+    """A list with no extra attributes other than the fact that it is a
+    disctinct class from 'list'. We'll use this to tell the difference
+    between an empty list and a list that implicitly defined."""
+
+    def copy(self):
+        """When we copy this list, make sure it returns another NullList. The
+        base list class probably should have probably done it this way."""
+        return NullList(self)
+
+
 # Tell yaml how to represent a ConfigDict (as a dictionary).
 representer.SafeRepresenter.add_representer(ConfigDict,
                                             representer.SafeRepresenter.represent_dict)
@@ -486,26 +497,29 @@ class ListElem(ConfigElement):
     type = list
     type_name = 'list of items'
 
-    def __init__(self, name=None, sub_elem=None, min_length=0, max_length=None, defaults=None,
-                 **kwargs):
+    def __init__(self, name=None, sub_elem=None, min_length=0, max_length=None,
+                 defaults=None, **kwargs):
         """
-        :param sub_elem: A ConfigItem that each item in the list must conform to.
-        :param min_length: The minimum number of items allowed, inclusive. Default: 0
-        :param max_length: The maximum number of items allowed, inclusive. None denotes unlimited.
-        :param [] defaults: Defaults on a list are items that are added to the list if no items
-            are explicitly added.
-
+        :param sub_elem: A ConfigItem that each item in the list must conform
+            to.
+        :param min_length: The minimum number of items allowed, inclusive.
+            Default: 0
+        :param max_length: The maximum number of items allowed, inclusive. None
+            denotes unlimited.
+        :param [] defaults: Defaults on a list are items that are added to the
+            list if no items are explicitly added.
         """
 
         if defaults is None:
-            defaults = list()
+            defaults = NullList()
 
         if min_length < 0:
             raise ValueError("min_length must be a positive integer.")
         self.min_length = min_length
         self.max_length = max_length
 
-        super(ListElem, self).__init__(name=name, _sub_elem=sub_elem, default=defaults, **kwargs)
+        super(ListElem, self).__init__(name=name, _sub_elem=sub_elem,
+                                       default=defaults, **kwargs)
 
     def _check_range(self, value):
         """Make sure our list is within the appropriate length range."""
@@ -519,35 +533,38 @@ class ListElem(ConfigElement):
             return False
 
     def validate(self, raw_values):
-        """Just like the parent function, except converts None to an empty list,
-        and single values of other types into the subtype for this list.  Subvalues are
-        recursively validated against the subitem type (whose name is ignored)."""
+        """Just like the parent function, except converts None to an empty
+        list, and single values of other types into the subtype for this
+        list.  Subvalues are recursively validated against the subitem type
+        (whose name is ignored).
+        :param list raw_values: A list of values to validate and add.
+        """
 
-        if self.default is None:
-            values = []
-        else:
-            values = self.default
+        if raw_values is None:
+            return self.default.copy()
+
+        values = []
 
         if not isinstance(raw_values, self.type):
-            if raw_values is not None:
-                raw_values = [raw_values]
-            else:
-                raw_values = []
+            raw_values = [raw_values]
 
         for val in raw_values:
             values.append(self._sub_elem.validate(val))
 
         if not self._check_range(values):
-            raise ValueError("Expected [{}-{}] list items for {} field {}, got {}.".format(
-                self.min_length,
-                self.max_length if self.max_length is not None else 'inf',
-                self.__class__.__name__,
-                self.name,
-                len(values)
-            ))
+            raise ValueError("Expected [{}-{}] list items for {} field {}, got "
+                             "{}.".format(
+                                          self.min_length,
+                                          self.max_length
+                                          if self.max_length
+                                          is not None else 'inf',
+                                          self.__class__.__name__,
+                                          self.name,
+                                          len(values)))
 
         for i in range(len(values)):
-            values[i] = self._run_post_validator(self._sub_elem, values, values[i])
+            values[i] = self._run_post_validator(self._sub_elem, values,
+                                                 values[i])
 
         return values
 
@@ -565,10 +582,12 @@ class ListElem(ConfigElement):
             key = parts[0]
             next_key = parts[1] if len(parts) == 2 else ''
             if key != '*':
-                raise KeyError("Invalid dotted key for {} called '{}'. List elements"
-                               "must have their element name given as a *, since it's "
-                               "sub-element isn't named. Got '{}' from '{}' instead."
-                               .format(self.__class__.__name__, self.name, key, dotted_key))
+                raise KeyError(
+                    "Invalid dotted key for {} called '{}'. List elements "
+                    "must have their element name given as a *, since it's "
+                    "sub-element isn't named. Got '{}' from '{}' instead."
+                    .format(self.__class__.__name__, self.name, key,
+                            dotted_key))
 
             return self._sub_elem.find(next_key)
 
@@ -596,11 +615,16 @@ class ListElem(ConfigElement):
         return events
 
     def merge(self, old, new):
-        """When merging lists, a new list simply replaces the old list, unless the new list is
-        None."""
+        """When merging lists, a new list simply replaces the old list, unless
+        the new list is empty."""
 
-        if new is None:
-            return old
+        # Don't override with an empty list that was defined implicitly.
+        if ((not new and isinstance(new, NullList)) or
+                new is None):
+            if old is None:
+                return list()
+            else:
+                return old
 
         return new.copy()
 
@@ -824,6 +848,14 @@ class KeyedElem(_DictElem):
 
     find.__doc__ = ConfigElement.find.__doc__
 
+    def merge(self, old, new):
+
+        base = old.copy()
+        for key, value in new.items():
+            base[key] = self.config_elems[key].merge(old[key], new[key])
+
+        return base
+
     def validate(self, values):
         """Ensure the given values conform to the config specification. Also adds any
         derived element values.
@@ -845,7 +877,7 @@ class KeyedElem(_DictElem):
         if self._key_case is self.KC_LOWER:
             given_keys = [k.lower() for k in values.keys()]
         elif self._key_case is self.KC_UPPER:
-            given_keys = [k.lower() for k in values.keys()]
+            given_keys = [k.upper() for k in values.keys()]
         else:
             given_keys = values.keys()
 
@@ -963,9 +995,12 @@ class CategoryElem(_DictElem):
         return out_dict
 
     def merge(self, old, new):
+
+        base = old.copy()
         for key, value in new.items():
-            old[key] = self._sub_elem.merge(old[key], new[key])
-        return old
+            base[key] = self._sub_elem.merge(old[key], new[key])
+
+        return base
 
     def find(self, dotted_key):
         if dotted_key == '':
