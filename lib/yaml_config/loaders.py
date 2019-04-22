@@ -44,11 +44,13 @@ class YamlConfigLoaderMixin:
 
         yaml.emit(events, outfile)
 
-    def load(self, infile):
+    def load(self, infile, partial=False):
         """Load a configuration YAML file from the given stream, and then validate against
         the config specification.
 
         :param stream infile: The input stream from which to read.
+        :param bool partial: The infile is not expected to be a complete
+        configuration, so missing 'required' fields can be ignored.
         :returns ConfigDict: A ConfigDict of the contents of the configuration file.
         :raises IOError: On stream read failures.
         :raises YAMLError: (and child exceptions) On YAML format issues.
@@ -57,7 +59,7 @@ class YamlConfigLoaderMixin:
 
         raw_data = yaml.load(infile)
 
-        return self.validate(raw_data)
+        return self.validate(raw_data, partial=partial)
 
     def load_empty(self):
         """Get a copy of the configuration, as if we had loaded an empty file. Essentially,
@@ -69,10 +71,12 @@ class YamlConfigLoaderMixin:
 
         return self.validate(self.type())
 
-    def load_merge(self, base_data, infile):
+    def load_merge(self, base_data, infile, partial=False):
         """Load the data infile, merge it into base_data, and then validate the combined result.
-        :param base_data:
-        :param file info:
+        :param base_data: Existing data to merge new data into.
+        :param file infile: The input file object.
+        :param bool partial: The infile is not expected to be a complete
+        configuration, so missing 'required' fields can be ignored.
         :returns ConfigDict: A ConfigDict of the contents of the configuration file.
         :raises IOError: On stream read failures.
         :raises YAMLError: (and child exceptions) On YAML format issues.
@@ -82,7 +86,7 @@ class YamlConfigLoaderMixin:
 
         data = self.merge(base_data, new_data)
 
-        return self.validate(data)
+        return self.validate(data, partial=partial)
 
     def merge(self, old, new):
         """This should be overridden by the element class."""
@@ -90,12 +94,16 @@ class YamlConfigLoaderMixin:
 
     @abstractmethod
     def yaml_events(self, values, show_comments, show_choices):
-        """This is expected to be defined by the co-inherited ConfigElement type."""
+        """This is expected to be defined by the co-inherited ConfigElement
+        type."""
         return [values, show_comments, show_choices]
 
     @abstractmethod
-    def validate(self, data):
-        """This is expected to be defined by the co-inherited ConfigElement type."""
+    def validate(self, data, partial=False):
+        """This is expected to be defined by the co-inherited ConfigElement
+            type."""
+        _ = partial
+
         return data
 
     @abstractmethod

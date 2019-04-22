@@ -2,6 +2,7 @@ from __future__ import print_function, division, unicode_literals
 
 import copy
 import inspect
+import pathlib
 import re
 import sys
 from abc import ABCMeta
@@ -95,25 +96,32 @@ class ConfigElement:
     # We use the representer functions in this to consistently represent certain types.
     _representer = yaml.representer.SafeRepresenter()
 
-    def __init__(self, name=None, default=None, required=False, hidden=False, _sub_elem=None,
-                 choices=None, post_validator=None, help_text=""):
+    def __init__(self, name=None, default=None, required=False, hidden=False,
+                 _sub_elem=None, choices=None, post_validator=None,
+                 help_text=""):
         """
         :param str_type name: The name of this configuration element. Required if this is a key in a
             KeyedElem. Will receive a descriptive default otherwise.
         :param default: The default value if no value is retrieved from a config file.
-        :param bool required: When validating a config file, a RequiredError will be thrown if
-            there is no value for this element. *NULL does not count as a value.*
-        :param hidden: Hidden elements are ignored when writing out the config (or example
-            configs). They can still be set by the user.
-        :param list choices: A optional sequence of values that this type will accept.
-        :param _post_validator post_validator: A optional post validation function for
-            this element. See the Post-Validation section in the online documentation for more info.
-        :param Union[ConfigElement,None] _sub_elem: The ConfigElement contained within this one,
-            such as for ListElem definitions. Meant to be set by subclasses if needed, never the
-            user. Names are optional for all sub-elements, and will be given sane defaults.
-        :param ConfigElement _sub_elem: The ConfigElement instance that describes the underlying
-            types for this config item. Mostly used by sub-classes.
-        :raises ValueError: May raise a value error for invalid configuration options.
+        :param bool required: When validating a config file, a RequiredError
+            will be thrown if there is no value for this element. *NULL does
+            not count as a value.*
+        :param hidden: Hidden elements are ignored when writing out the config
+            (or example configs). They can still be set by the user.
+        :param list choices: A optional sequence of values that this type will
+            accept.
+        :param _post_validator post_validator: A optional post validation
+            function for this element. See the Post-Validation section in
+            the online documentation for more info.
+        :param Union[ConfigElement,None] _sub_elem: The ConfigElement
+            contained within this one, such as for ListElem definitions. Meant
+            to be set by subclasses if needed, never the user. Names are
+            optional for all sub-elements, and will be given sane defaults.
+        :param ConfigElement _sub_elem: The ConfigElement instance that
+            describes the underlying types for this config item. Mostly used by
+            sub-classes.
+        :raises ValueError: May raise a value error for invalid configuration
+            options.
         """
 
         if name is not None:
@@ -197,7 +205,7 @@ class ConfigElement:
         self.validate(value)
         self._default = value
 
-    def validate(self, value):
+    def validate(self, value, partial=False):
         """Validate the given value, and return the validated form.
 
         :returns: The value, converted to this type if needed.
@@ -210,7 +218,7 @@ class ConfigElement:
             if value is None:
                 if self._default is not None:
                     value = self._default
-                elif self.required:
+                elif self.required and not partial:
                     raise RequiredError("Config missing required value for {} named {}."
                                         .format(self.__class__.__name__, self.name))
 
@@ -440,12 +448,19 @@ class FloatRangeElem(FloatElem, RangeElem):
 
 
 class BoolElem(ScalarElem):
-    """A boolean element. YAML automatically translates many strings into boolean values."""
+    """A boolean element. YAML automatically translates many strings into
+    boolean values."""
     type = bool
 
 
 class StrElem(ScalarElem):
+    """A basic string element."""
     type = str_type
+
+
+class PathElem(ScalarElem):
+    """An element that always expects a filesystem path."""
+    type = pathlib.Path
 
 
 class RegexElem(StrElem):
@@ -532,12 +547,13 @@ class ListElem(ConfigElement):
         else:
             return False
 
-    def validate(self, raw_values):
+    def validate(self, raw_values, partial=False):
         """Just like the parent function, except converts None to an empty
         list, and single values of other types into the subtype for this
         list.  Subvalues are recursively validated against the subitem type
         (whose name is ignored).
         :param list raw_values: A list of values to validate and add.
+        :param bool partial: Ignore 'required'
         """
 
         if raw_values is None:
@@ -549,7 +565,7 @@ class ListElem(ConfigElement):
             raw_values = [raw_values]
 
         for val in raw_values:
-            values.append(self._sub_elem.validate(val))
+            values.append(self._sub_elem.validate(val, partial=partial))
 
         if not self._check_range(values):
             raise ValueError("Expected [{}-{}] list items for {} field {}, got "
@@ -565,6 +581,10 @@ class ListElem(ConfigElement):
         for i in range(len(values)):
             values[i] = self._run_post_validator(self._sub_elem, values,
                                                  values[i])
+
+        if self.required and not (partial or values):
+            raise RequiredError("Required ListElem '{}' is empty."
+                                .format(self.name))
 
         return values
 
@@ -641,8 +661,9 @@ class CodeElem(ListElem):
         subtype = StrElem(name='code_line')
         super(CodeElem, self).__init__(name, sub_elem=subtype, **kwargs)
 
-    def validate(self, lines):
-        lines = [self._sub_elem.validate(line) for line in lines if line is not None]
+    def validate(self, lines, partial=False):
+        lines = [self._sub_elem.validate(line, partial)
+                 for line in lines if line is not None]
 
         code_block = '\n'.join(lines).strip()
         if not code_block.endswith('\n'):
@@ -746,7 +767,7 @@ class _DictElem(ConfigElement):
     def find(self, value):
         raise NotImplementedError
 
-    def validate(self, value):
+    def validate(self, value, partial=False):
         raise NotImplementedError
 
     def _key_check(self, values_dict):
@@ -856,11 +877,12 @@ class KeyedElem(_DictElem):
 
         return base
 
-    def validate(self, values):
+    def validate(self, values, partial=False):
         """Ensure the given values conform to the config specification. Also adds any
         derived element values.
 
         :param dict values: The dictionary of values to validate.
+        :param bool partial: Ignore 'required'.
         :returns dict: The validated and type converted value dict.
         :raises TypeError: if type conversion can't occur.
         :raises ValueError: When the value is not within range.
@@ -870,6 +892,9 @@ class KeyedElem(_DictElem):
         out_dict = self.result_dict_type()
 
         if values is None:
+            if self.required and not partial:
+                raise RequiredError("Missing required KeyedElem '{}' in "
+                                    "config.".format(self.name))
             values = {}
 
         self._key_check(values)
@@ -893,7 +918,10 @@ class KeyedElem(_DictElem):
                 derived_elements.append(elem)
             else:
                 # Validate each of the subkeys in this dict.
-                out_dict[key] = self.config_elems[key].validate(values.get(key))
+                out_dict[key] = self.config_elems[key].validate(
+                    values.get(key),
+                    partial=partial,
+                )
 
         # Handle any derived elements
         for elem in derived_elements:
@@ -962,10 +990,14 @@ class CategoryElem(_DictElem):
         super(CategoryElem, self).__init__(name=name, _sub_elem=sub_elem, key_case=key_case,
                                            default=defaults, **kwargs)
 
-    def validate(self, value_dict):
+    def validate(self, value_dict, partial=False):
         out_dict = self.result_dict_type()
 
         if value_dict is None:
+            if self.required and not partial:
+                raise RequiredError("Missing CategoryElem '{}' in config."
+                                    .format(self.name))
+
             value_dict = {}
 
         # Make sure the keys are sane
@@ -981,7 +1013,7 @@ class CategoryElem(_DictElem):
             if self._choices is not None and key not in self._choices:
                 raise ValueError("Invalid key for {} called {}. '{}' not in given choices.")
 
-            validated_value = self._sub_elem.validate(value)
+            validated_value = self._sub_elem.validate(value, partial=partial)
             # Merge the validated values with the defaults from the hard coded defaults
             # if present.
             if key in out_dict:
@@ -1080,7 +1112,7 @@ class DefaultedCategoryElem(CategoryElem):
                                                     sub_elem=KeyedElem(elements),
                                                     **kwargs)
 
-    def validate(self, value_dict):
+    def validate(self, value_dict, partial=False):
         out_dict = self.result_dict_type()
 
         # Make sure the keys are sane
@@ -1105,7 +1137,7 @@ class DefaultedCategoryElem(CategoryElem):
             value = defaults.copy()
             # We know our sub-element is a dict in this case.
             value.update(base_value)
-            validated_value = self._sub_elem.validate(value)
+            validated_value = self._sub_elem.validate(value, partial)
             # Merge the validated values with the defaults from the hard coded defaults
             # if present.
             if key in out_dict:
