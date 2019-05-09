@@ -9,8 +9,8 @@ from abc import ABCMeta
 from collections import OrderedDict, defaultdict
 
 # A modified pyyaml library
-import yaml
-from yaml import representer
+from yc_yaml import representer
+import yc_yaml as yaml
 
 if sys.version_info[0] == 2:
     str_type = unicode
@@ -63,8 +63,12 @@ class NullList(list):
 
 
 # Tell yaml how to represent a ConfigDict (as a dictionary).
-representer.SafeRepresenter.add_representer(ConfigDict,
-                                            representer.SafeRepresenter.represent_dict)
+representer.SafeRepresenter.add_representer(
+    ConfigDict,
+    representer.SafeRepresenter.represent_dict)
+representer.SafeRepresenter.add_multi_representer(
+    pathlib.Path,
+    lambda s, d: representer.SafeRepresenter.represent_str(s, str(d)))
 
 
 # This is a dummy for type analyzers
@@ -129,11 +133,11 @@ class ConfigElement:
 
         self.name = name
 
+        self.required = required
         self.hidden = hidden
         if self.hidden and (default is None and self.required):
             raise ValueError("You must set a default for required, hidden Config Elements.")
 
-        self.required = required
         self._choices = choices
         self.help_text = help_text
 
@@ -627,9 +631,11 @@ class ListElem(ConfigElement):
         if value is not None:
             # Value is expected to be a list of items at this point.
             for v in value:
-                events.extend(self._sub_elem.yaml_events(v, show_comments, show_choices))
+                events.extend(
+                    self._sub_elem.yaml_events(v, show_comments, show_choices))
         else:
-            events.extend(self._sub_elem.yaml_events(None, show_comments, show_choices))
+            events.extend(
+                self._sub_elem.yaml_events(None, show_comments, show_choices))
 
         events.append(yaml.SequenceEndEvent())
         return events
@@ -652,8 +658,8 @@ class ListElem(ConfigElement):
 # TODO: Make this worthwhile
 class CodeElem(ListElem):
     """Like a list config item, except the subtype is always string, and the
-    subitems are considered to be a single group. Useful for config sections that are
-    really lines of code or documentation."""
+    subitems are considered to be a single group. Useful for config sections
+    that are really lines of code or documentation."""
     type = list
     type_name = 'code block'
 
@@ -675,7 +681,8 @@ class CodeElem(ListElem):
     def _analyze(self, code):
         """This to be overridden to run a syntax validator for the given code.
         By default, it does nothing.
-        :raises ValueError: Any errors raised in validation should be converted to ValueErrors.
+        :raises ValueError: Any errors raised in validation should be converted
+            to ValueErrors.
         """
         pass
         # try:
@@ -690,24 +697,27 @@ class CodeElem(ListElem):
             lines = value.split('\n')
         else:
             lines = None
-        return super(CodeElem, self).yaml_events(lines, show_comments, show_choices)
+        return super(CodeElem, self).yaml_events(lines, show_comments,
+                                                 show_choices)
 
 
 class DerivedElem(ConfigElement):
-    """The value is derived from the values of other elements. This is only valid when used
-    as an element in a KeyedElem (or YamlConfig), trying to use it elsewhere will raise an
-    exception (It simply doesn't make sense anywhere else).
+    """The value is derived from the values of other elements. This is only
+    valid when used as an element in a KeyedElem (or YamlConfig), trying to
+    use it elsewhere will raise an exception (It simply doesn't make sense
+    anywhere else).
 
-    Resolution of this element is deferred until after all non-derived elements are resolved. All
-    derived elements are then resolved in the order they were listed. This resolution is performed
-    by a function, which can be given either:
+    Resolution of this element is deferred until after all non-derived
+    elements are resolved. All derived elements are then resolved in the
+    order they were listed. This resolution is performed by a function,
+    which can be given either:
 
       - As the 'resolver' argument to __init__
       - The 'resolve' method of this class
       - The 'resolve_<name>' method of the parent KeyedElem or YamlConfig class.
 
-    This function is expected to take one positional argument, which is the dictionary of
-    validated values from the KeyedElem so far.
+    This function is expected to take one positional argument, which is the
+    dictionary of validated values from the KeyedElem so far.
     """
 
     def __init__(self, name, resolver=None, **kwargs):
@@ -719,21 +729,23 @@ class DerivedElem(ConfigElement):
         super(DerivedElem, self).__init__(name=name, _sub_elem=None, **kwargs)
 
     def resolve(self, siblings):
-        """A resolver function gets a dictionary of its returned sibling's values, and should return
-        the derived value. A resolver passed as an argument to DerivedElem's __init__ should have
-        the same signature (without the self).
+        """A resolver function gets a dictionary of its returned sibling's
+        values, and should return the derived value. A resolver passed as an
+        argument to DerivedElem's __init__ should have the same signature (
+        without the self).
 
-        :param {} siblings: The dictionary of validated values from the keyed element that this
-            is a part of.
+        :param {} siblings: The dictionary of validated values from the
+            keyed element that this is a part of.
         :returns: The derived element value
         """
         return None
 
     def find(self, dotted_key):
         if dotted_key != '':
-            raise ValueError("Invalid key '{0}' for {1} called '{2}'. Since {1} don't have"
-                             "sub-elements, the key must be '' by this point."
-                             .format(dotted_key, self.__class__.__name__, self.name))
+            raise ValueError(
+                "Invalid key '{0}' for {1} called '{2}'. Since {1} don't have"
+                "sub-elements, the key must be '' by this point."
+                .format(dotted_key, self.__class__.__name__, self.name))
         return self
 
     def yaml_events(self, value, show_comments, show_choices):
@@ -757,8 +769,9 @@ class _DictElem(ConfigElement):
             key_case = self.KC_LOWER
 
         if key_case not in (self.KC_LOWER, self.KC_UPPER, self.KC_MIXED):
-            raise ValueError("Invalid key case. Expected one of <cls>.KC_LOWER, "
-                             "<cls>.KC_UPPER, <cls>.KC_MIXED")
+            raise ValueError(
+                "Invalid key case. Expected one of <cls>.KC_LOWER, "
+                "<cls>.KC_UPPER, <cls>.KC_MIXED")
 
         self._key_case = key_case
 
@@ -771,14 +784,17 @@ class _DictElem(ConfigElement):
         raise NotImplementedError
 
     def _key_check(self, values_dict):
-        """Raises a KeyError if keys don't match the key regex, or there are duplicates. Keys are
-        converted to upper, lower, or left in their original case depending on 'self._key_case'.
+        """Raises a KeyError if keys don't match the key regex, or there are
+        duplicates. Keys are converted to upper, lower, or left in their
+        original case depending on 'self._key_case'.
 
         :param {} values_dict: The dictionary to check.
         """
 
         if not isinstance(values_dict, dict):
-            raise ValueError("Invalid values ({}) for element {}".format(values_dict, self.name))
+            raise ValueError(
+                "Invalid values ({}) for element {}"
+                .format(values_dict, self.name))
         
         # Check for duplicate keys.
         keys = defaultdict(lambda: [])
@@ -792,31 +808,36 @@ class _DictElem(ConfigElement):
             keys[key_mod].append(key)
 
             if self._NAME_RE.match(key_mod) is None:
-                raise KeyError("Invalid key '{}' in {} called {}. Key does not match expected "
-                               "regular expression '{}'"
-                               .format(key_mod, self.__class__.__name__, self.name,
-                                       self._NAME_RE.pattern))
+                raise KeyError(
+                    "Invalid key '{}' in {} called {}. Key does not match "
+                    "expected regular expression '{}'"
+                    .format(key_mod, self.__class__.__name__, self.name,
+                            self._NAME_RE.pattern))
 
         for k_list in keys.values():
             if len(k_list) != 1:
-                raise KeyError("Duplicate keys given {} in {} called {}. (Keys in this config "
-                               "object are automatically converted to {}case."
-                               .format(k_list, self.__class__.__name__, self.name, self._key_case))
+                raise KeyError("Duplicate keys given {} in {} called {}. ("
+                               "Keys in this config object are automatically "
+                               "converted to {}case."
+                               .format(k_list, self.__class__.__name__,
+                                       self.name, self._key_case))
 
 
 class KeyedElem(_DictElem):
-    """A dictionary configuration item with predefined keys that may have non-uniform types. The
-    valid keys are are given as ConfigItem objects, with their names being used as the key name."""
+    """A dictionary configuration item with predefined keys that may have
+    non-uniform types. The valid keys are are given as ConfigItem objects,
+    with their names being used as the key name."""
 
     type = dict
 
     def __init__(self, name=None, elements=None, key_case=_DictElem.KC_LOWER,
                  **kwargs):
         """
-        :param key_case: Must be one of the <cls>.KC_* values. Determines whether keys are
-                         automatically converted to lower or upper case, or left alone.
-        :param elements: This list of config elements is also forms the list of accepted keys,
-                         with the element.name being the key.
+        :param key_case: Must be one of the <cls>.KC_* values. Determines
+            whether keys are automatically converted to lower or upper case,
+            or left alone.
+        :param elements: This list of config elements is also forms the list
+            of accepted keys, with the element.name being the key.
         """
 
         self.config_elems = OrderedDict()
@@ -828,10 +849,13 @@ class KeyedElem(_DictElem):
 
         for i in range(len(elements)):
             elem = elements[i]
-            # Make sure each sub-element has a usable name that can be used as a key..
+            # Make sure each sub-element has a usable name that can be used
+            # as a key..
             if elem.name is None:
-                raise ValueError("In KeyedConfig item ({}), subitem {} has name of None."
-                                 .format(self.name if self.name is not None else '<unnamed>', i))
+                raise ValueError(
+                    "In KeyedConfig item ({}), subitem {} has name of None."
+                    .format(self.name if self.name is not None else '<unnamed>',
+                            i))
 
             # Make sure derived elements have a resolver defined somewhere.
             if isinstance(elem, DerivedElem):
@@ -840,16 +864,19 @@ class KeyedElem(_DictElem):
             self.config_elems[elem.name] = elem
 
     def _find_resolver(self, elem):
-        """Find the resolver function for the given DerivedElem. Try the elem.resolve method
-        first, then look for a 'get_<elem.name>' method next. Raises a ValueError on failure."""
+        """Find the resolver function for the given DerivedElem. Try the
+        elem.resolve method first, then look for a 'get_<elem.name>' method
+        next. Raises a ValueError on failure."""
 
         if elem.resolve is not None:
             return elem.resolve
         elif hasattr(self, 'resolve_' + elem.name):
             return getattr(self, 'resolve_' + elem.name)
         else:
-            raise ValueError("Could not find resolver for derived element '{}' in {} called {}."
-                             .format(elem.name, self.__class__.__name__, self.name))
+            raise ValueError(
+                "Could not find resolver for derived element '{}' in {} "
+                "called {}."
+                .format(elem.name, self.__class__.__name__, self.name))
 
     def find(self, dotted_key):
         if dotted_key == '':
@@ -859,11 +886,12 @@ class KeyedElem(_DictElem):
             key = parts[0]
             next_key = parts[1] if len(parts) == 2 else ''
             if key not in self.config_elems:
-                raise KeyError("Invalid dotted key for {} called '{}'. KeyedElem"
-                               "element names must be in the defined keys. "
-                               "Got '{}' from '{}', but valid keys are {}"
-                               .format(self.__class__.__name__, self.name,
-                                       key, dotted_key, self.config_elems.keys()))
+                raise KeyError(
+                    "Invalid dotted key for {} called '{}'. KeyedElem"
+                    "element names must be in the defined keys. "
+                    "Got '{}' from '{}', but valid keys are {}"
+                    .format(self.__class__.__name__, self.name,
+                            key, dotted_key, self.config_elems.keys()))
 
             return self.config_elems[key].find(next_key)
 
@@ -878,8 +906,8 @@ class KeyedElem(_DictElem):
         return base
 
     def validate(self, values, partial=False):
-        """Ensure the given values conform to the config specification. Also adds any
-        derived element values.
+        """Ensure the given values conform to the config specification. Also
+            adds any derived element values.
 
         :param dict values: The dictionary of values to validate.
         :param bool partial: Ignore 'required'.
@@ -909,7 +937,8 @@ class KeyedElem(_DictElem):
         unknown_keys = set(given_keys).difference(self.config_elems.keys())
         if unknown_keys:
             raise KeyError("Invalid config key '{}' given under {} called '{}'."
-                           .format(unknown_keys.pop(), self.__class__.__name__, self.name))
+                           .format(unknown_keys.pop(), self.__class__.__name__,
+                                   self.name))
 
         derived_elements = []
 
@@ -938,7 +967,8 @@ class KeyedElem(_DictElem):
             values = dict()
 
         events = list()
-        events.append(yaml.MappingStartEvent(anchor=None, tag=None, implicit=True))
+        events.append(yaml.MappingStartEvent(anchor=None, tag=None,
+                                             implicit=True))
         for key, elem in self.config_elems.items():
             # Don't output anything for Derived Elements
             if isinstance(elem, DerivedElem):
@@ -953,28 +983,30 @@ class KeyedElem(_DictElem):
             events.append(yaml.ScalarEvent(value=key, anchor=None,
                                            tag=None, implicit=(True, True)))
             # Add the mapping value
-            events.extend(elem.yaml_events(value, show_choices))
+            events.extend(elem.yaml_events(value, show_comments, show_choices))
         events.append(yaml.MappingEndEvent())
         return events
 
 
 class CategoryElem(_DictElem):
-    """A dictionary config item where all the keys must be of the same type, but the key values
-    themselves do not have to be predefined. The possible keys may still be restricted with
-    the choices argument to init."""
+    """A dictionary config item where all the keys must be of the same type,
+    but the key values themselves do not have to be predefined. The possible
+    keys may still be restricted with the choices argument to init."""
 
     type = dict
 
-    def __init__(self, name=None, sub_elem=None, defaults=None, key_case=_DictElem.KC_LOWER,
-                 **kwargs):
+    def __init__(self, name=None, sub_elem=None, defaults=None,
+                 key_case=_DictElem.KC_LOWER, **kwargs):
         """
         :param name: The name of this Config Element
         :param sub_elem: The type all keys in this mapping must conform to.
-        :param choices: The possible keys for this element. None denotes that any are valid.
+        :param choices: The possible keys for this element. None denotes
+        that any are valid.
         :param required: Whether this element is required.
         :param defaults: An optional dictionary of default key:value pairs.
-        :param key_case: Must be one of the <cls>.KC_* values. Determines whether keys are
-                         automatically converted to lower or upper case, or left alone.
+        :param key_case: Must be one of the <cls>.KC_* values. Determines
+        whether keys are automatically converted to lower or upper case,
+        or left alone.
         :param help_text: Description of the purpose and usage of this element.
         """
 
@@ -982,12 +1014,14 @@ class CategoryElem(_DictElem):
             defaults = dict()
 
         if isinstance(sub_elem, DerivedElem):
-            raise ValueError("Using a derived element as the sub-element in a CategoryElem "
-                             "does not make sense.")
+            raise ValueError(
+                "Using a derived element as the sub-element in a CategoryElem "
+                "does not make sense.")
 
         self._sub_elem = sub_elem
 
-        super(CategoryElem, self).__init__(name=name, _sub_elem=sub_elem, key_case=key_case,
+        super(CategoryElem, self).__init__(name=name, _sub_elem=sub_elem,
+                                           key_case=key_case,
                                            default=defaults, **kwargs)
 
     def validate(self, value_dict, partial=False):
@@ -1011,18 +1045,21 @@ class CategoryElem(_DictElem):
         for key, value in value_dict.items():
             key = key.lower()
             if self._choices is not None and key not in self._choices:
-                raise ValueError("Invalid key for {} called {}. '{}' not in given choices.")
+                raise ValueError(
+                    "Invalid key for {} called {}. '{}' not in given choices.")
 
             validated_value = self._sub_elem.validate(value, partial=partial)
-            # Merge the validated values with the defaults from the hard coded defaults
-            # if present.
+            # Merge the validated values with the defaults from the hard
+            # coded defaults if present.
             if key in out_dict:
-                out_dict[key] = self._sub_elem.merge(out_dict[key], validated_value)
+                out_dict[key] = self._sub_elem.merge(out_dict[key],
+                                                     validated_value)
             else:
                 out_dict[key] = validated_value
 
         for key, value in out_dict.items():
-            out_dict[key] = self._run_post_validator(self._sub_elem, out_dict, value)
+            out_dict[key] = self._run_post_validator(self._sub_elem, out_dict,
+                                                     value)
 
         return out_dict
 
@@ -1042,10 +1079,12 @@ class CategoryElem(_DictElem):
             key = parts[0]
             next_key = parts[1] if len(parts) == 2 else ''
             if key != '*':
-                raise KeyError("Invalid dotted key for {} called '{}'. CategoryElem"
-                               "must have their element name given as a *, since it's "
-                               "sub-element isn't named. Got '{}' from '{}' instead."
-                               .format(self.__class__.__name__, self.name, key, dotted_key))
+                raise KeyError(
+                    "Invalid dotted key for {} called '{}'. CategoryElem"
+                    "must have their element name given as a *, since it's "
+                    "sub-element isn't named. Got '{}' from '{}' instead."
+                    .format(self.__class__.__name__, self.name,
+                            key, dotted_key))
 
             return self._sub_elem.find(next_key)
 
@@ -1055,17 +1094,20 @@ class CategoryElem(_DictElem):
             values = dict()
 
         events = list()
-        events.append(yaml.MappingStartEvent(anchor=None, tag=None, implicit=True))
+        events.append(yaml.MappingStartEvent(anchor=None, tag=None,
+                                             implicit=True))
         if show_comments:
             comment = self._sub_elem.make_comment(show_choices, show_name=False)
             events.append(yaml.CommentEvent(value=comment))
         if values:
             for key, value in values.items():
                 # Add the mapping key.
-                events.append(yaml.ScalarEvent(value=self.name, anchor=None,
+                events.append(yaml.ScalarEvent(value=key, anchor=None,
                                                tag=None, implicit=(True, True)))
                 # Add the mapping value.
-                events.extend(self._sub_elem.yaml_events(value, show_comments, show_choices))
+                events.extend(self._sub_elem.yaml_events(value,
+                                                         show_comments,
+                                                         show_choices))
         events.append(yaml.MappingEndEvent())
         return events
 
