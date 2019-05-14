@@ -7,6 +7,7 @@ import re
 import sys
 from abc import ABCMeta
 from collections import OrderedDict, defaultdict
+import textwrap
 
 # A modified pyyaml library
 from yc_yaml import representer
@@ -241,7 +242,7 @@ class ConfigElement:
 
         return value
 
-    def make_comment(self, show_choices=True, show_name=True):
+    def make_comment(self, width, show_choices=True, show_name=True):
         """Create a comment for this configuration element.
 
         :param show_name: Whether to show the name of this element.
@@ -253,13 +254,16 @@ class ConfigElement:
             name = ''
         else:
             name = self.name.upper()
-        comment = ['{name}({required}{type}){colon} {help}'.format(
+        comment = '{name}({required}{type}){colon} {help}'.format(
             name=name if show_name else '',
             required='required ' if self.required else '',
             type=self._type_name,
             colon=':' if self.help_text else '',
             help=self.help_text,
-        )]
+        )
+
+        comment = textwrap.wrap(comment, width)
+
         if show_choices and self._choices:
             choices_doc = self._choices_doc()
             if choices_doc is not None:
@@ -298,16 +302,21 @@ class ConfigElement:
 
         raise NotImplementedError("Implemented by individual elements.")
 
-    def yaml_events(self, value, show_comments, show_choices):
+    def yaml_events(self, value, show_comments,
+                    show_choices, comment_width=80):
         """Returns the yaml events to represent this config item.
+            :param comment_width:
             :param value: The value of this config element. May be None.
-            :param show_comments: Whether or not to include comments.
-            :param show_choices: Whether or not to show the choices string in the comments.
+            :param int show_comments: Whether or not to include comments.
+            :param show_choices: Whether or not to show the choices string
+            in the comments.
+            :param int comment_width: Width at which we wrap comments.
         """
 
-        raise NotImplementedError("When defining a new element type, you must define "
-                                  "how to turn it (and any sub elements) into a list of "
-                                  "yaml events.")
+        raise NotImplementedError(
+            "When defining a new element type, you must define "
+            "how to turn it (and any sub elements) into a list of "
+            "yaml events.")
 
     def _choices_doc(self):
         """Returns a list of strings documenting the available choices and type for this item.
@@ -370,23 +379,27 @@ class ScalarElem(ConfigElement):
         super(ScalarElem, self).__init__(name=name, _sub_elem=None, **kwargs)
 
     def _represent(self, value):
-        """ We use the built in yaml representation system to 'serialize' scalars.
+        """ We use the built in yaml representation system to 'serialize'
+        scalars.
         :returns (value, tag)"""
         # Use the representer from yaml to handle this properly.
         node = self._representer.represent_data(value)
         return node.value, node.tag
 
-    def yaml_events(self, value, show_comments, show_choices):
-        # Get our serialized representation of value, and return it as a ScalarEvent.
+    def yaml_events(self, value, show_comments, show_choices, comment_width=80):
+        # Get our serialized representation of value, and return it as a
+        # ScalarEvent.
+
         tag = None
         if value is not None:
             value, tag = self._represent(value)
-        return [yaml.ScalarEvent(value=value, anchor=None, tag=tag, implicit=(True, True))]
+        return [yaml.ScalarEvent(value=value, anchor=None, tag=tag,
+                                 implicit=(True, True))]
 
     def find(self, dotted_key):
         if dotted_key != '':
-            raise KeyError("Scalars don't have sub-elements, so the only valid find "
-                           "string is '' for them.")
+            raise KeyError("Scalars don't have sub-elements, so the only "
+                           "valid find  string is '' for them.")
 
         return self
 
@@ -615,7 +628,7 @@ class ListElem(ConfigElement):
 
             return self._sub_elem.find(next_key)
 
-    def yaml_events(self, value, show_comments, show_choices):
+    def yaml_events(self, value, show_comments, show_choices, comment_width=80):
         events = list()
         events.append(yaml.SequenceStartEvent(
             anchor=None,
@@ -625,17 +638,25 @@ class ListElem(ConfigElement):
         ))
 
         if show_comments:
-            comment = self._sub_elem.make_comment(show_choices, show_name=False)
+            comment = self._sub_elem.make_comment(width=comment_width,
+                                                  show_choices=show_choices,
+                                                  show_name=False)
             events.append(yaml.CommentEvent(value=comment))
 
         if value is not None:
             # Value is expected to be a list of items at this point.
             for v in value:
                 events.extend(
-                    self._sub_elem.yaml_events(v, show_comments, show_choices))
+                    self._sub_elem.yaml_events(v, show_comments,
+                                               show_choices,
+                                               comment_width=comment_width))
         else:
             events.extend(
-                self._sub_elem.yaml_events(None, show_comments, show_choices))
+                self._sub_elem.yaml_events(None,
+                                           show_comments,
+                                           show_choices,
+                                           comment_width=comment_width
+                                           ))
 
         events.append(yaml.SequenceEndEvent())
         return events
@@ -690,15 +711,20 @@ class CodeElem(ListElem):
         # except Exception as err:
         #   raise ValueError(err)
 
-    def yaml_events(self, value, show_comments, show_choices):
-        """Treat each line a separate list element."""
+    def yaml_events(self, value, show_comments, show_choices, comment_width=80):
+        """Treat each line a separate list element.
+        :param comment_width:
+        """
 
         if value is not None:
             lines = value.split('\n')
         else:
             lines = None
-        return super(CodeElem, self).yaml_events(lines, show_comments,
-                                                 show_choices)
+        return super(CodeElem, self).yaml_events(lines,
+                                                 show_comments,
+                                                 show_choices,
+                                                 comment_width=comment_width,
+                                                 )
 
 
 class DerivedElem(ConfigElement):
@@ -748,8 +774,10 @@ class DerivedElem(ConfigElement):
                 .format(dotted_key, self.__class__.__name__, self.name))
         return self
 
-    def yaml_events(self, value, show_comments, show_choices):
-        """Derived elements are never written to file."""
+    def yaml_events(self, value, show_comments, show_choices, comment_width=80):
+        """Derived elements are never written to file.
+        :param comment_width:
+        """
         return []
 
     def set_default(self, dotted_key, value):
@@ -962,7 +990,10 @@ class KeyedElem(_DictElem):
 
         return out_dict
 
-    def yaml_events(self, values, show_comments, show_choices):
+    def yaml_events(self, values,
+                    show_comments,
+                    show_choices,
+                    comment_width=80):
         if values is None:
             values = dict()
 
@@ -970,20 +1001,28 @@ class KeyedElem(_DictElem):
         events.append(yaml.MappingStartEvent(anchor=None, tag=None,
                                              implicit=True))
         for key, elem in self.config_elems.items():
+            if elem.hidden:
+                continue
+
             # Don't output anything for Derived Elements
             if isinstance(elem, DerivedElem):
                 continue
 
             value = values.get(key, None)
             if show_comments:
-                comment = elem.make_comment(show_choices)
+                comment = elem.make_comment(width=comment_width,
+                                            show_choices=show_choices)
                 events.append(yaml.CommentEvent(value=comment))
 
             # Add the mapping key
             events.append(yaml.ScalarEvent(value=key, anchor=None,
                                            tag=None, implicit=(True, True)))
             # Add the mapping value
-            events.extend(elem.yaml_events(value, show_comments, show_choices))
+            events.extend(elem.yaml_events(value,
+                                           show_comments,
+                                           show_choices,
+                                           comment_width=comment_width,
+                                           ))
         events.append(yaml.MappingEndEvent())
         return events
 
@@ -1088,8 +1127,11 @@ class CategoryElem(_DictElem):
 
             return self._sub_elem.find(next_key)
 
-    def yaml_events(self, values, show_comments, show_choices):
-        """Create a mapping event list, based on the values given."""
+    def yaml_events(self, values, show_comments, show_choices,
+                    comment_width=80):
+        """Create a mapping event list, based on the values given.
+        :param comment_width:
+        """
         if values is None:
             values = dict()
 
@@ -1097,7 +1139,10 @@ class CategoryElem(_DictElem):
         events.append(yaml.MappingStartEvent(anchor=None, tag=None,
                                              implicit=True))
         if show_comments:
-            comment = self._sub_elem.make_comment(show_choices, show_name=False)
+            comment = self._sub_elem.make_comment(
+                width=comment_width,
+                show_choices=show_choices,
+                show_name=False)
             events.append(yaml.CommentEvent(value=comment))
         if values:
             for key, value in values.items():
@@ -1105,9 +1150,14 @@ class CategoryElem(_DictElem):
                 events.append(yaml.ScalarEvent(value=key, anchor=None,
                                                tag=None, implicit=(True, True)))
                 # Add the mapping value.
-                events.extend(self._sub_elem.yaml_events(value,
-                                                         show_comments,
-                                                         show_choices))
+                events.extend(
+                    self._sub_elem.yaml_events(
+                        value,
+                        show_comments,
+                        show_choices,
+                        comment_width=comment_width
+                    ))
+
         events.append(yaml.MappingEndEvent())
         return events
 
