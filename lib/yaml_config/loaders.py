@@ -61,15 +61,16 @@ class YamlConfigLoaderMixin:
 
         return self.validate(raw_data, partial=partial)
 
-    def load_empty(self):
+    def load_empty(self, partial=True):
         """Get a copy of the configuration, as if we had loaded an empty file. Essentially,
         get a configuration with just the defaults.
 
+        :param bool partial: The config is not expected to be complete.
         :returns ConfigDict: A ConfigDict of the contents of the configuration file.
         :raises ValueError, RequiredError, KeyError: As per validate().
         """
 
-        return self.validate(self.type())
+        return self.validate(self.type(), partial=partial)
 
     def load_merge(self, base_data, infile, partial=False):
         """Load the data infile, merge it into base_data, and then validate the combined result.
