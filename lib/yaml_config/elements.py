@@ -115,7 +115,7 @@ class ConfigElement:
             (or example configs). They can still be set by the user.
         :param list choices: A optional sequence of values that this type will
             accept.
-        :param _post_validator post_validator: A optional post validation
+        :param post_validator post_validator: A optional post validation
             function for this element. See the Post-Validation section in
             the online documentation for more info.
         :param Union[ConfigElement,None] _sub_elem: The ConfigElement
@@ -137,31 +137,38 @@ class ConfigElement:
         self.required = required
         self.hidden = hidden
         if self.hidden and (default is None and self.required):
-            raise ValueError("You must set a default for required, hidden Config Elements.")
+            raise ValueError(
+                "You must set a default for required, hidden Config Elements.")
 
         self._choices = choices
         self.help_text = help_text
 
-        # Run this validator on the field data (and all data at this level and lower) when
+        # Run this validator on the field data (and all data at this level
+        # and lower) when
         # validating
         if not hasattr(self, 'post_validator'):
             self.post_validator = post_validator
 
-        # The type name is usually pulled straight from the type's __name__ attribute
-        # This overrides that, when not None
+        # The type name is usually pulled straight from the type's __name__
+        # attribute This overrides that, when not None
         if self._type_name is None:
             self._type_name = self.type.__name__
 
-        # Several ConfigElement types have a sub_elem. This adds an empty one at the top level
-        # so we can have methods that work with it at this level too.
+        # Several ConfigElement types have a sub_elem. This adds an empty
+        # one at the top level so we can have methods that work with it at
+        # this level too.
         if _sub_elem is not None:
             if inspect.isclass(_sub_elem):
-                raise ValueError("Sub-element of '{0}' must be a Config Element instance of "
-                                 "some kind. Got a class instead: {1}"
-                                 .format(self.name if self.name is not None else self, _sub_elem))
+                raise ValueError(
+                    "Sub-element of '{0}' must be a Config Element instance of "
+                    "some kind. Got a class instead: {1}"
+                    .format(self.name if self.name is not None else self,
+                            _sub_elem))
             elif not isinstance(_sub_elem, ConfigElement):
-                raise ValueError("Sub-elements must be a config element of some kind. Got: {}"
-                                 .format(_sub_elem))
+                raise ValueError(
+                    "Sub-elements must be a config element of some kind. "
+                    "Got: {}"
+                    .format(_sub_elem))
 
         self._sub_elem = _sub_elem
 
@@ -174,8 +181,9 @@ class ConfigElement:
             self.default = default
 
     def _set_sub_elem_names(self):
-        """Names are optional for sub-elements. If one isn't given, this sets a reasonable default
-        so that we can tell where errors came from."""
+        """Names are optional for sub-elements. If one isn't given,
+        this sets a reasonable default so that we can tell where errors came
+        from."""
 
         # We can't set names on the sub_elem if we have neither
         if self._sub_elem is None or self.name is None:
@@ -197,9 +205,10 @@ class ConfigElement:
         :raises ValueError: When out of range."""
 
         if self._choices and value not in self._choices:
-            raise ValueError("Value '{}' not in the given choices {} for {} called '{}'.".format(
-                value, self._choices, self.__class__.__name__, self.name
-            ))
+            raise ValueError(
+                "Value '{}' not in the given choices {} for {} called '{}'.".format(
+                    value, self._choices, self.__class__.__name__, self.name
+                ))
 
     @property
     def default(self):
@@ -224,8 +233,9 @@ class ConfigElement:
                 if self._default is not None:
                     value = self._default
                 elif self.required and not partial:
-                    raise RequiredError("Config missing required value for {} named {}."
-                                        .format(self.__class__.__name__, self.name))
+                    raise RequiredError(
+                        "Config missing required value for {} named {}."
+                        .format(self.__class__.__name__, self.name))
 
             # If there is no value, return no value.
             if value is None:
@@ -236,7 +246,8 @@ class ConfigElement:
                 value = converter(value)
             except TypeError:
                 raise TypeError("Incorrect type for {} field {}: {}"
-                                .format(self.__class__.__name__, self.name, value))
+                                .format(self.__class__.__name__, self.name,
+                                        value))
 
         self._check_range(value)
 
@@ -326,14 +337,16 @@ class ConfigElement:
 
     def _validate_name(self, name):
         if name != name.lower():
-            raise ValueError("Invalid name for config field {} called {}. Names must "
-                             "be lowercase".format(self.__class__.__name__, name))
+            raise ValueError(
+                "Invalid name for config field {} called {}. Names must "
+                "be lowercase".format(self.__class__.__name__, name))
 
         if self._NAME_RE.match(name) is None:
-            raise ValueError("Invalid name for config field {} called {}. Names must "
-                             "start with a letter, and be composed of only letters, "
-                             "numbers, and underscores."
-                             .format(self.__class__.__name__, name))
+            raise ValueError(
+                "Invalid name for config field {} called {}. Names must "
+                "start with a letter, and be composed of only letters, "
+                "numbers, and underscores."
+                .format(self.__class__.__name__, name))
 
     def _represent(self, value):
         """Give the yaml representation for this type. Since we're not representing generic
@@ -347,9 +360,10 @@ class ConfigElement:
         :param siblings: The siblings
         """
 
-        # Don't run post-validation on non-required fields that don't have a value.
-        if not elem.required and value is None:
-            return None
+        # Don't run post-validation on non-required fields that don't have a
+        # value.
+        #if not elem.required and value is None:
+        #    return None
 
         try:
             if elem.post_validator is not None:
@@ -363,13 +377,15 @@ class ConfigElement:
                 return value
         except ValueError as err:
             # Reformat any ValueErrors to point to where this happened.
-            raise ValueError("Error in post-validation of {} called '{}' with value '{}': {}"
-                             .format(elem.__class__.__name__, elem.name, value, err))
+            raise ValueError("Error in post-validation of {} called '{}' "
+                             "with value '{}': {}"
+                             .format(elem.__class__.__name__, elem.name,
+                                     value, err))
 
     def merge(self, old, new):
-        """Merge the new values of this entry into the existing one. For most types,
-        the old values are simply replaced. For complex types (lists, dicts), the
-        behaviour varies."""
+        """Merge the new values of this entry into the existing one. For
+        most types, the old values are simply replaced. For complex types (
+        lists, dicts), the behaviour varies."""
 
         return new
 
@@ -427,7 +443,8 @@ class RangeElem(ScalarElem):
         :param vmin: The minimum value for this element, inclusive.
         :param vmax: The max value, inclusive.
         """
-        super(RangeElem, self).__init__(name=name, choices=[vmin, vmax], **kwargs)
+        super(RangeElem, self).__init__(name=name, choices=[vmin, vmax],
+                                        **kwargs)
 
     def _choices_doc(self):
         if self._choices == (None, None):
@@ -493,9 +510,10 @@ class RegexElem(StrElem):
 
     def _check_range(self, value):
         if self.regex.match(value) is None:
-            raise ValueError("Value {} does not match regex '{}' for {} called '{}'".format(
-                value, self._choices[0], self.__class__.__name__, self.name
-            ))
+            raise ValueError(
+                "Value {} does not match regex '{}' for {} called '{}'".format(
+                    value, self._choices[0], self.__class__.__name__, self.name
+                ))
 
     def _choices_doc(self):
         return "Values must match: r'{regex}'".format(regex=self._choices[0])
@@ -587,13 +605,13 @@ class ListElem(ConfigElement):
         if not self._check_range(values):
             raise ValueError("Expected [{}-{}] list items for {} field {}, got "
                              "{}.".format(
-                                          self.min_length,
-                                          self.max_length
-                                          if self.max_length
-                                          is not None else 'inf',
-                                          self.__class__.__name__,
-                                          self.name,
-                                          len(values)))
+                self.min_length,
+                self.max_length
+                if self.max_length
+                   is not None else 'inf',
+                self.__class__.__name__,
+                self.name,
+                len(values)))
 
         for i in range(len(values)):
             values[i] = self._run_post_validator(self._sub_elem, values,
@@ -623,8 +641,8 @@ class ListElem(ConfigElement):
                     "Invalid dotted key for {} called '{}'. List elements "
                     "must have their element name given as a *, since it's "
                     "sub-element isn't named. Got '{}' from '{}' instead."
-                    .format(self.__class__.__name__, self.name, key,
-                            dotted_key))
+                        .format(self.__class__.__name__, self.name, key,
+                                dotted_key))
 
             return self._sub_elem.find(next_key)
 
@@ -771,7 +789,7 @@ class DerivedElem(ConfigElement):
             raise ValueError(
                 "Invalid key '{0}' for {1} called '{2}'. Since {1} don't have"
                 "sub-elements, the key must be '' by this point."
-                .format(dotted_key, self.__class__.__name__, self.name))
+                    .format(dotted_key, self.__class__.__name__, self.name))
         return self
 
     def yaml_events(self, value, show_comments, show_choices, comment_width=80):
@@ -822,8 +840,8 @@ class _DictElem(ConfigElement):
         if not isinstance(values_dict, dict):
             raise ValueError(
                 "Invalid values ({}) for element {}"
-                .format(values_dict, self.name))
-        
+                    .format(values_dict, self.name))
+
         # Check for duplicate keys.
         keys = defaultdict(lambda: [])
         for key in values_dict.keys():
@@ -839,8 +857,8 @@ class _DictElem(ConfigElement):
                 raise KeyError(
                     "Invalid key '{}' in {} called {}. Key does not match "
                     "expected regular expression '{}'"
-                    .format(key_mod, self.__class__.__name__, self.name,
-                            self._NAME_RE.pattern))
+                        .format(key_mod, self.__class__.__name__, self.name,
+                                self._NAME_RE.pattern))
 
         for k_list in keys.values():
             if len(k_list) != 1:
@@ -882,8 +900,9 @@ class KeyedElem(_DictElem):
             if elem.name is None:
                 raise ValueError(
                     "In KeyedConfig item ({}), subitem {} has name of None."
-                    .format(self.name if self.name is not None else '<unnamed>',
-                            i))
+                        .format(
+                        self.name if self.name is not None else '<unnamed>',
+                        i))
 
             # Make sure derived elements have a resolver defined somewhere.
             if isinstance(elem, DerivedElem):
@@ -904,7 +923,7 @@ class KeyedElem(_DictElem):
             raise ValueError(
                 "Could not find resolver for derived element '{}' in {} "
                 "called {}."
-                .format(elem.name, self.__class__.__name__, self.name))
+                    .format(elem.name, self.__class__.__name__, self.name))
 
     def find(self, dotted_key):
         if dotted_key == '':
@@ -918,8 +937,8 @@ class KeyedElem(_DictElem):
                     "Invalid dotted key for {} called '{}'. KeyedElem"
                     "element names must be in the defined keys. "
                     "Got '{}' from '{}', but valid keys are {}"
-                    .format(self.__class__.__name__, self.name,
-                            key, dotted_key, self.config_elems.keys()))
+                        .format(self.__class__.__name__, self.name,
+                                key, dotted_key, self.config_elems.keys()))
 
             return self.config_elems[key].find(next_key)
 
@@ -986,7 +1005,8 @@ class KeyedElem(_DictElem):
 
         # Run custom post validation against each key, if given.
         for key, elem in self.config_elems.items():
-            out_dict[key] = self._run_post_validator(elem, out_dict, out_dict[key])
+            out_dict[key] = self._run_post_validator(elem, out_dict,
+                                                     out_dict[key])
 
         return out_dict
 
@@ -1122,8 +1142,8 @@ class CategoryElem(_DictElem):
                     "Invalid dotted key for {} called '{}'. CategoryElem"
                     "must have their element name given as a *, since it's "
                     "sub-element isn't named. Got '{}' from '{}' instead."
-                    .format(self.__class__.__name__, self.name,
-                            key, dotted_key))
+                        .format(self.__class__.__name__, self.name,
+                                key, dotted_key))
 
             return self._sub_elem.find(next_key)
 
@@ -1201,7 +1221,8 @@ class DefaultedCategoryElem(CategoryElem):
         self.default_key = default_key
 
         super(DefaultedCategoryElem, self).__init__(name=name,
-                                                    sub_elem=KeyedElem(elements),
+                                                    sub_elem=KeyedElem(
+                                                        elements),
                                                     **kwargs)
 
     def validate(self, value_dict, partial=False):
@@ -1223,7 +1244,8 @@ class DefaultedCategoryElem(CategoryElem):
         for key, base_value in value_dict.items():
             key = key.lower()
             if self._choices is not None and key not in self._choices:
-                raise ValueError("Invalid key for {} called {}. '{}' not in given choices.")
+                raise ValueError(
+                    "Invalid key for {} called {}. '{}' not in given choices.")
 
             # Use the defaults from self.DEFAULT_KEY as the base for each value.
             value = defaults.copy()
@@ -1233,13 +1255,13 @@ class DefaultedCategoryElem(CategoryElem):
             # Merge the validated values with the defaults from the hard coded defaults
             # if present.
             if key in out_dict:
-                out_dict[key] = self._sub_elem.merge(out_dict[key], validated_value)
+                out_dict[key] = self._sub_elem.merge(out_dict[key],
+                                                     validated_value)
             else:
                 out_dict[key] = validated_value
 
         for key, value in out_dict.items():
-            out_dict[key] = self._run_post_validator(self._sub_elem, out_dict, value)
+            out_dict[key] = self._run_post_validator(self._sub_elem, out_dict,
+                                                     value)
 
         return out_dict
-
-
