@@ -894,21 +894,23 @@ class KeyedElem(_DictElem):
         super(KeyedElem, self).__init__(name=name, key_case=key_case, **kwargs)
 
         for i in range(len(elements)):
-            elem = elements[i]
-            # Make sure each sub-element has a usable name that can be used
-            # as a key..
-            if elem.name is None:
-                raise ValueError(
-                    "In KeyedConfig item ({}), subitem {} has name of None."
-                        .format(
-                        self.name if self.name is not None else '<unnamed>',
-                        i))
+            self.add_element(elements[i])
 
-            # Make sure derived elements have a resolver defined somewhere.
-            if isinstance(elem, DerivedElem):
-                self._find_resolver(elem)
+    def add_element(self, elem):
+        # Make sure each sub-element has a usable name that can be used
+        # as a key..
+        if elem.name is None:
+            raise ValueError(
+                "In KeyedConfig item ({}), subitem {} has name of None."
+                .format(
+                    self.name if self.name is not None else '<unnamed>',
+                    elem))
 
-            self.config_elems[elem.name] = elem
+        # Make sure derived elements have a resolver defined somewhere.
+        if isinstance(elem, DerivedElem):
+            self._find_resolver(elem)
+
+        self.config_elems[elem.name] = elem
 
     def _find_resolver(self, elem):
         """Find the resolver function for the given DerivedElem. Try the
@@ -1126,7 +1128,10 @@ class CategoryElem(_DictElem):
 
         base = old.copy()
         for key, value in new.items():
-            base[key] = self._sub_elem.merge(old[key], new[key])
+            if key in old:
+                base[key] = self._sub_elem.merge(old[key], new[key])
+            else:
+                base[key] = new[key]
 
         return base
 
