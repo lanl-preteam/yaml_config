@@ -1,4 +1,4 @@
-from . elements import KeyedElem, CategoryElem, ListElem
+from . elements import KeyedElem, CategoryElem, ListElem, ConfigDict
 
 from abc import ABCMeta, abstractmethod
 
@@ -6,14 +6,17 @@ import yc_yaml as yaml
 
 
 class YamlConfigLoaderMixin:
-    """Converts a ConfigElement class into a class that also knows how to load and dump the
-    configuration to file. A class variable of some sort, to be overridden by the class end-user,
-    is expected to hold the information to initialize the ConfigElement base. Only KeyedElem,
-    CategoryElem, and ListElem really make since as bases to mix this in with."""
+    """Converts a ConfigElement class into a class that also knows how to
+    load and dump the configuration to file. A class variable of some sort,
+    to be overridden by the class end-user, is expected to hold the
+    information to initialize the ConfigElement base. Only KeyedElem,
+    CategoryElem, and ListElem really make since as bases to mix this
+    in with."""
 
-    # Note below that the method resolution order in the classes that call YamlConfigMixin methods
-    # last. That's needed to make it easy to call the ConfigElem classes' __init__ method easily,
-    # but also to ensure that the abstract methods in this mixin are ignored, as they must be.
+    # Note below that the method resolution order in the classes that call
+    # YamlConfigMixin method last. That's needed to make it easy to call the
+    # ConfigElem classes' __init__ method easily, but also to ensure that the
+    # abstract methods in this mixin are ignored, as they must be.
 
     __metaclass__ = ABCMeta
 
@@ -60,6 +63,13 @@ class YamlConfigLoaderMixin:
         raw_data = yaml.load(infile)
 
         return self.validate(raw_data, partial=partial)
+
+    @staticmethod
+    def load_raw(infile):
+        """Load the raw config. This just does a yaml.load with no
+        validation. You're expected to validate separately."""
+
+        return yaml.load(infile)
 
     def load_empty(self, partial=True):
         """Get a copy of the configuration, as if we had loaded an empty file. Essentially,
