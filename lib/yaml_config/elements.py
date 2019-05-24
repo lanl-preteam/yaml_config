@@ -116,7 +116,7 @@ class ConfigElement:
         :param post_validator post_validator: A optional post validation
             function for this element. See the Post-Validation section in
             the online documentation for more info.
-        :param Union[ConfigElement,None] _sub_elem: The ConfigElement
+        :param Union(ConfigElement, None) _sub_elem: The ConfigElement
             contained within this one, such as for ListElem definitions. Meant
             to be set by subclasses if needed, never the user. Names are
             optional for all sub-elements, and will be given sane defaults.
@@ -187,7 +187,7 @@ class ConfigElement:
         if self._sub_elem is None or self.name is None:
             return
 
-        # The * isn't a super obvious, but it matches the 'find' syntax.
+        # The * isn't super obvious, but it matches the 'find' syntax.
         if self._sub_elem.name is None:
             self._sub_elem.name = '{}.*'.format(self.name)
 
@@ -227,7 +227,7 @@ class ConfigElement:
         :raises TypeError: If the type conversion fails.
         """
 
-        if type(value) is not self.type:
+        if not isinstance(value, self.type):
             if value is None:
                 return None
 
@@ -240,6 +240,8 @@ class ConfigElement:
                 raise TypeError("Incorrect type for {} field {}: {}"
                                 .format(self.__class__.__name__, self.name,
                                         value))
+            
+        return value
 
     def validate(self, value, partial=False):
         """Validate the given value, and return the validated form.
@@ -408,7 +410,7 @@ class ConfigElement:
 
 class ScalarElem(ConfigElement):
     def __init__(self, name=None, **kwargs):
-        super(ScalarElem, self).__init__(name=name, _sub_elem=None, **kwargs)
+        super().__init__(name=name, _sub_elem=None, **kwargs)
 
     def _represent(self, value):
         """ We use the built in yaml representation system to 'serialize'
@@ -901,7 +903,7 @@ class KeyedElem(_DictElem):
     non-uniform types. The valid keys are are given as ConfigItem objects,
     with their names being used as the key name."""
 
-    type = dict
+    type = ConfigDict
 
     def __init__(self, name=None, elements=None, key_case=_DictElem.KC_LOWER,
                  **kwargs):
@@ -1111,7 +1113,7 @@ class CategoryElem(_DictElem):
     but the key values themselves do not have to be predefined. The possible
     keys may still be restricted with the choices argument."""
 
-    type = dict
+    type = ConfigDict
 
     def __init__(self, name=None, sub_elem=None, defaults=None,
                  key_case=_DictElem.KC_LOWER, **kwargs):
@@ -1136,12 +1138,6 @@ class CategoryElem(_DictElem):
                 "Using a derived element as the sub-element in a CategoryElem "
                 "does not make sense.")
 
-        try:
-            sub_elem.validate(defaults)
-        except Exception as err:
-            raise ValueError("Defaults for '{}' can't be validated. {}"
-                             .format(name, err))
-
         self._sub_elem = sub_elem
 
         super(CategoryElem, self).__init__(name=name, _sub_elem=sub_elem,
@@ -1159,6 +1155,10 @@ class CategoryElem(_DictElem):
 
         out_dict = self.type()
 
+        if not isinstance(values, dict):
+            raise TypeError("Expected a dict/mapping for key '{}', got '{}'."
+                            .format(self.name, values))
+
         for key, value in values.items():
             out_dict[key] = self._sub_elem.normalize(value)
 
@@ -1172,6 +1172,7 @@ class CategoryElem(_DictElem):
             if self.required and not partial:
                 raise RequiredError("Missing CategoryElem '{}' in config."
                                     .format(self.name))
+            value_dict = {}
 
         out_dict = self.type()
 
