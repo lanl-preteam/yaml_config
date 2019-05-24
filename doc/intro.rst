@@ -1,7 +1,7 @@
 Getting Started
 ===============
 
-YamlConfig is a set of utilities for strictly describing a YAML configuration file,
+Yaml Config is a set of utilities for strictly describing a YAML configuration file,
 loading it, and validating that the contents conform to the specification. It is also
 capable of taking the description and automatically producing an example configuration
 in the specified format, complete with comments.
@@ -21,15 +21,15 @@ mode only.
 Basic Usage
 -----------
 
-YamlConfigs consist of ConfigElement() instantiations attached to
+Yaml Configs consist of ConfigElement() instantiations attached to
 container ConfigElement instantiations. These provide the structure
 that is used to describe, parse, and output the configuration file. These are
-all contained within a user defined subclass of YamlConfig, which is really
+all contained within a user defined subclass of Yaml Config, which is really
 just a strictly keyed dictionary ConfigElement with some extras.::
 
     import yaml_config as yc
 
-    class BirthdayPartyConfig(yc.YamlConfig):
+    class BirthdayPartyConfig(yc.YamlConfigLoader):
         # A list of the valid ConfigElement keys for this config. A list is used to preserve
         # the element order.
         ELEMENTS = [
@@ -75,21 +75,22 @@ The example file produced looks like: ::
     # Choices: chocolate, vanilla
     cake:
 
-You can also give the config data to YamlConfig.dump(), which will produce a filled out
+You can also give the config data to YamlConfigLoader.dump(), which will produce a filled out
 configuration.
 
 Restrictions and Limitations
 -----------------------------
-YamlConfig does not preserve formatting end to end. While it will read any valid YAML file (and
+Yaml Config does not preserve formatting end to end. While it will read any valid YAML file (and
 validate any that conform to a config specification), it will not preserve the formatting if it
 subsequently re-dumps the same data.
 
-Additionally, there are a few format restrictions that YamlConfig imposes:
+Additionally, there are a few format restrictions that Yaml Config imposes:
 
- * Because YamlConfig allows loaded data keys to be accessed through attributes (ie `data.key1`),
+ * Because Yaml Config allows loaded data keys to be accessed through attributes (ie `data.key1`),
    only keys that are valid python identifiers are allowed. The regex is `r'[a-z][a-z0-9_]'`.
  * Keys read from files are treated as case insensitive, and are always referred to in lowercase.
  * For Lists and Category elements, the types of each entry must be the same.
+
  * Validation/format enforcement occurs on data load. You can separately validate before
    dumping using your config objects `.validate(data)` method.
 

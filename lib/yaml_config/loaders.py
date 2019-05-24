@@ -29,17 +29,18 @@ class YamlConfigLoaderMixin:
         """Write the configuration to the given output stream.
 
         :param stream outfile: A writable stream object
-        :param {} values: Write the configuration file with the given values inserted. Values
-            should be a dictionary as produced by YamlConfig.load().
-        :param bool show_comments: When dumping the config file, include help_text and general
-            element information as comments. Default True.
-        :param bool show_choices: When creating comments, include the choices available for
-            each item. Default True.
+        :param {} values: Write the configuration file with the given values
+            inserted. Values should be a dictionary as produced by
+            YamlConfigLoader.load().
+        :param bool show_comments: When dumping the config file, include
+            help_text and general element information as comments. Default True.
+        :param bool show_choices: When creating comments, include the
+            choices available for each item. Default True.
         """
 
-        # We're recursively generating a list of pyYaml events, which will then be emitted to
-        # create the yaml file. Each element knows how to represent itself and how to include
-        # any child elements.
+        # We're recursively generating a list of pyYaml events, which will
+        # then be emitted to create the yaml file. Each element knows how to
+        # represent itself and how to include any child elements.
         events = list()
         events.extend([yaml.StreamStartEvent(), yaml.DocumentStartEvent()])
         events.extend(self.yaml_events(values, show_comments, show_choices))
@@ -48,13 +49,14 @@ class YamlConfigLoaderMixin:
         yaml.emit(events, outfile)
 
     def load(self, infile, partial=False):
-        """Load a configuration YAML file from the given stream, and then validate against
-        the config specification.
+        """Load a configuration YAML file from the given stream, and then
+        validate against the config specification.
 
         :param stream infile: The input stream from which to read.
         :param bool partial: The infile is not expected to be a complete
-        configuration, so missing 'required' fields can be ignored.
-        :returns ConfigDict: A ConfigDict of the contents of the configuration file.
+            configuration, so missing 'required' fields can be ignored.
+        :returns ConfigDict: A ConfigDict of the contents of the configuration
+            file.
         :raises IOError: On stream read failures.
         :raises YAMLError: (and child exceptions) On YAML format issues.
         :raises ValueError, RequiredError, KeyError: As per validate().
@@ -62,7 +64,9 @@ class YamlConfigLoaderMixin:
 
         raw_data = yaml.load(infile)
 
-        return self.validate(raw_data, partial=partial)
+        values = self.normalize(raw_data)
+
+        return self.validate(values, partial=partial)
 
     @staticmethod
     def load_raw(infile):
@@ -97,6 +101,8 @@ class YamlConfigLoaderMixin:
 
         data = self.merge(base_data, new_data)
 
+        data = self.normalize(data)
+
         return self.validate(data, partial=partial)
 
     def merge(self, old, new):
@@ -118,8 +124,14 @@ class YamlConfigLoaderMixin:
         return data
 
     @abstractmethod
+    def normalize(self, values):
+        """This will be overridden."""
+        return values
+
+    @abstractmethod
     def find(self, dotted_key):
-        """This is expected to be defined by the co-inherited ConfigElement type."""
+        """This is expected to be defined by the co-inherited ConfigElement
+        type."""
         return dotted_key
 
     def set_default(self, dotted_key, value):
@@ -133,7 +145,7 @@ class YamlConfigLoaderMixin:
 
         Examples: ::
 
-            class DessertConfig(yc.YamlConfig):
+            class DessertConfig(yc.YamlConfigLoader):
                 ELEMENTS = [
                     yc.KeyedElem('pie', elements=[
                         yc.StrElem('fruit')
@@ -145,7 +157,7 @@ class YamlConfigLoaderMixin:
             # Set the 'fruit' element of the 'pie' element to have a default of 'apple'.
             config.set_default('pie.fruit', 'apple')
 
-            class Config2(yc.YamlConfig):
+            class Config2(yc.YamlConfigLoader):
                 ELEMENTS = [
                     yc.ListElem('cars', sub_elem=yc.KeyedElem(elements=[
                         yc.StrElem('color'),
@@ -180,7 +192,7 @@ class YamlConfigLoader(KeyedElem, YamlConfigLoaderMixin):
 
         import yaml_config as yc
 
-        class StrictConfig(yc.YamlConfig):
+        class StrictConfig(yc.YamlConfigLoader):
             # These are the only keys allowed.
             ELEMENTS = [
                 yc.StrElem('first_name', required=True),
@@ -209,18 +221,18 @@ class YamlConfigLoader(KeyedElem, YamlConfigLoaderMixin):
 
 
 class CatYamlConfigLoader(CategoryElem, YamlConfigLoaderMixin):
-    """This is just like YamlConfig, except instead of giving a list of elements to use as
-    strict keys in a KeyedElem, we get a single BASE to use as the type for each sub-element in a
-    CategoryElem.
+    """This is just like YamlConfigLoader, except instead of giving a list of
+    elements to use as strict keys in a KeyedElem, we get a single BASE to
+    use as the type for each sub-element in a CategoryElem.
 
     Example: ::
 
         import yaml_config as yc
 
-        class UserConfig(yc.CategoryYamlConfig):
+        class UserConfig(yc.CateYamlConfigLoader):
             # This is the type that each key must conform to.
             BASE = yc.KeyedElem(elements=[
-                # We define elements just like for the YamlConfig. As a
+                # We define elements just like for the YamlConfigLoader. As a
                 # KeyedElem, these are the only keys allowed
                 yc.StrElem('first_name', required=True),
                 yc.StrElem('last_name', required=True),
@@ -239,22 +251,25 @@ class CatYamlConfigLoader(CategoryElem, YamlConfigLoaderMixin):
             last_name: May
             age: 54
 
-    :cvar [str] HEADER: The documentation that should appear at the top of the config file.
-    :cvar ConfigElement BASE: A single ConfigElement describing what all the keys at the base
-        level of this config must look like.
+    :cvar [str] HEADER: The documentation that should appear at the top of
+        the config file.
+    :cvar ConfigElement BASE: A single ConfigElement describing what all the
+        keys at the base level of this config must look like.
     """
 
     BASE = None
 
     def __init__(self):
-        super(CatYamlConfigLoader, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
+        super(CatYamlConfigLoader, self).__init__(
+            sub_elem=self.BASE, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
         self.name = '<root>'
 
 
 class ListYamlConfigLoader(ListElem, YamlConfigLoaderMixin):
-    """A YamlConfig where the base element is a ListElem. Like normal list elements, all
-    items in the list must have the same element type, described by BASE.
+    """A YamlConfigLoader where the base element is a ListElem. Like normal
+    list elements, all items in the list must have the same element type,
+    described by BASE.
 
     Example: ::
 
@@ -270,14 +285,16 @@ class ListYamlConfigLoader(ListElem, YamlConfigLoaderMixin):
         - apples
         - cantaloupe
 
-    :cvar [str] HEADER: The documentation that should appear at the top of the config file.
-    :cvar ConfigElement BASE: A single ConfigElement describing what each item in the base level
-        list of this config must look like.
+    :cvar [str] HEADER: The documentation that should appear at the top of
+        the config file.
+    :cvar ConfigElement BASE: A single ConfigElement describing what each
+        item in the base level list of this config must look like.
 
     """
 
     BASE = None
 
     def __init__(self):
-        super(ListYamlConfigLoader, self).__init__(sub_elem=self.BASE, help_text=self.HEADER)
+        super(ListYamlConfigLoader, self).__init__(
+            sub_elem=self.BASE, help_text=self.HEADER)
         self.name = '<root>'

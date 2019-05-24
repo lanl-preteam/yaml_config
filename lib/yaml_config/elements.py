@@ -2,14 +2,14 @@ import copy
 import inspect
 import pathlib
 import re
-import sys
+import textwrap
 from abc import ABCMeta
 from collections import OrderedDict, defaultdict
-import textwrap
 
+import yc_yaml as yaml
 # A modified pyyaml library
 from yc_yaml import representer
-import yc_yaml as yaml
+
 
 # This module defines a set of constructs for strictly defining configuration
 # objects that get their data from Yaml files. It allows for the general (
@@ -26,10 +26,11 @@ class RequiredError(ValueError):
 
 
 class ConfigDict(dict):
-    """Since we enforce field names that are also valid python names, we can build this
-    dict that allows for getting and setting keys like attributes.
+    """Since we enforce field names that are also valid python names, we can
+    build this dict that allows for getting and setting keys like attributes.
 
-    The following marks this class as having dynamic attributes for IDE typechecking.
+    The following marks this class as having dynamic attributes for IDE
+    typechecking.
     @DynamicAttrs
     """
 
@@ -100,9 +101,11 @@ class ConfigElement:
                  _sub_elem=None, choices=None, post_validator=None,
                  help_text=""):
         """
-        :param str name: The name of this configuration element. Required if this is a key in a
-            KeyedElem. Will receive a descriptive default otherwise.
-        :param default: The default value if no value is retrieved from a config file.
+        :param str name: The name of this configuration element. Required if
+            this is a key in a KeyedElem. Will receive a descriptive default
+            otherwise.
+        :param default: The default value if no value is retrieved from a config
+            file.
         :param bool required: When validating a config file, a RequiredError
             will be thrown if there is no value for this element. *NULL does
             not count as a value.*
@@ -155,8 +158,8 @@ class ConfigElement:
         if _sub_elem is not None:
             if inspect.isclass(_sub_elem):
                 raise ValueError(
-                    "Sub-element of '{0}' must be a Config Element instance of "
-                    "some kind. Got a class instead: {1}"
+                    "Sub-element of '{0}' must be a Config Element instance "
+                    "of some kind. Got a class instead: {1}"
                     .format(self.name if self.name is not None else self,
                             _sub_elem))
             elif not isinstance(_sub_elem, ConfigElement):
@@ -192,7 +195,8 @@ class ConfigElement:
         self._sub_elem._set_sub_elem_names()
 
     def _check_range(self, value):
-        """Make sure the value is in the given list of choices. Throws a ValueError if not.
+        """Make sure the value is in the given list of choices. Throws a
+        ValueError if not.
 
         The value of *self.choices* doesn't matter outside of this method.
 
@@ -201,8 +205,12 @@ class ConfigElement:
 
         if self._choices and value not in self._choices:
             raise ValueError(
-                "Value '{}' not in the given choices {} for {} called '{}'.".format(
-                    value, self._choices, self.__class__.__name__, self.name
+                "Value '{}' not in the given choices {} for {} called '{}'."
+                .format(
+                    value,
+                    self._choices,
+                    self.__class__.__name__,
+                    self.name
                 ))
 
     @property
@@ -258,9 +266,10 @@ class ConfigElement:
     def make_comment(self, width, show_choices=True, show_name=True):
         """Create a comment for this configuration element.
 
+        :param int width: The wrap-width of the comments
         :param show_name: Whether to show the name of this element.
-        :param show_choices: Whether to include the valid choices for this item in the help
-                             comments.
+        :param show_choices: Whether to include the valid choices for this
+            item in the help comments.
         :returns: A comment string."""
 
         if self.name is None:
@@ -284,23 +293,26 @@ class ConfigElement:
         return '\n'.join(comment)
 
     def find(self, dotted_key):
-        """Find the element matching the given dotted key. This is useful for retrieving
-        elements to use their help_text or defaults.
+        """Find the element matching the given dotted key. This is useful
+        for retrieving elements to use their help_text or defaults.
 
         Dotted keys look like normal property references, except that the
-        names of the sub-element for Lists or Collections are given as a '*', since they
-        don't have an explicit name. An empty string always returns this element.
+        names of the sub-element for Lists or Collections are given as a '*',
+        since they don't have an explicit name. An empty string always
+        returns this element.
 
         Examples: ::
 
-            class Config2(yc.YamlConfig):
+            class Config2(yc.YamlConfigLoader):
                 ELEMENTS = [
                     yc.ListElem('cars', sub_elem=yc.KeyedElem(elements=[
                         yc.StrElem('color'),
                         yc.StrElem('make'),
                         yc.IntElem('year'),
-                        yc.CollectionElem('accessories', sub_elem=yc.KeyedElem(elements=[
-                            yc.StrElem('floor_mats')
+                        yc.CollectionElem(
+                            'accessories',
+                            sub_elem=yc.KeyedElem(elements=[
+                                yc.StrElem('floor_mats')
                         ])
                     ]
                 ]
@@ -332,8 +344,9 @@ class ConfigElement:
             "yaml events.")
 
     def _choices_doc(self):
-        """Returns a list of strings documenting the available choices and type for this item.
-        This may also return None, in which cases choices will never be given."""
+        """Returns a list of strings documenting the available choices and
+        type for this item. This may also return None, in which cases
+        choices will never be given."""
 
         return 'Choices: ' + ', '.join(map(str, self._choices))
 
@@ -351,8 +364,9 @@ class ConfigElement:
                 .format(self.__class__.__name__, name))
 
     def _represent(self, value):
-        """Give the yaml representation for this type. Since we're not representing generic
-        python objects, we only need to do this for scalars."""
+        """Give the yaml representation for this type. Since we're not
+        representing generic python objects, we only need to do this for
+        scalars."""
         return value
 
     def _run_post_validator(self, elem, siblings, value):
@@ -364,7 +378,7 @@ class ConfigElement:
 
         # Don't run post-validation on non-required fields that don't have a
         # value.
-        #if not elem.required and value is None:
+        # if not elem.required and value is None:
         #    return None
 
         try:
@@ -522,11 +536,13 @@ class RegexElem(StrElem):
 
 
 class ListElem(ConfigElement):
-    """A list of configuration items. All items in the list must be the same ConfigElement type.
-    Configuration inheritance appends new, unique items to these lists.
+    """A list of configuration items. All items in the list must be the same
+    ConfigElement type. Configuration inheritance appends new, unique items
+    to these lists.
 
-    A shortcut is allowed in the interpretation of lists, such that a single value is
-    interpreted as a single valued list. Each of the following is valid. ::
+    A shortcut is allowed in the interpretation of lists, such that a single
+    value is interpreted as a single valued list. Each of the following is
+    valid. ::
 
         colors: red
         colors: [red, yellow, green]
@@ -535,7 +551,8 @@ class ListElem(ConfigElement):
             - yellow
             - blue
 
-    However, if the sub-element is another list, the lists must always be explicit. ::
+    However, if the sub-element is another list, the lists must always be
+    explicit. ::
 
         collections:
             - [quarter, dime, nickel]
@@ -651,8 +668,8 @@ class ListElem(ConfigElement):
                     "Invalid dotted key for {} called '{}'. List elements "
                     "must have their element name given as a *, since it's "
                     "sub-element isn't named. Got '{}' from '{}' instead."
-                        .format(self.__class__.__name__, self.name, key,
-                                dotted_key))
+                    .format(self.__class__.__name__, self.name, key,
+                            dotted_key))
 
             return self._sub_elem.find(next_key)
 
@@ -758,9 +775,9 @@ class CodeElem(ListElem):
 
 class DerivedElem(ConfigElement):
     """The value is derived from the values of other elements. This is only
-    valid when used as an element in a KeyedElem (or YamlConfig), trying to
-    use it elsewhere will raise an exception (It simply doesn't make sense
-    anywhere else).
+    valid when used as an element in a KeyedElem (or YamlConfigLoader),
+    trying to use it elsewhere will raise an exception (It simply doesn't
+    make sense anywhere else).
 
     Resolution of this element is deferred until after all non-derived
     elements are resolved. All derived elements are then resolved in the
@@ -769,7 +786,8 @@ class DerivedElem(ConfigElement):
 
       - As the 'resolver' argument to __init__
       - The 'resolve' method of this class
-      - The 'resolve_<name>' method of the parent KeyedElem or YamlConfig class.
+      - The 'resolve_<name>' method of the parent KeyedElem or
+        YamlConfigLoader class.
 
     This function is expected to take one positional argument, which is the
     dictionary of validated values from the KeyedElem so far.
@@ -800,13 +818,11 @@ class DerivedElem(ConfigElement):
             raise ValueError(
                 "Invalid key '{0}' for {1} called '{2}'. Since {1} don't have"
                 "sub-elements, the key must be '' by this point."
-                    .format(dotted_key, self.__class__.__name__, self.name))
+                .format(dotted_key, self.__class__.__name__, self.name))
         return self
 
     def yaml_events(self, value, show_comments, show_choices, comment_width=80):
-        """Derived elements are never written to file.
-        :param comment_width:
-        """
+        """Derived elements are never written to file."""
         return []
 
     def set_default(self, dotted_key, value):
@@ -851,7 +867,7 @@ class _DictElem(ConfigElement):
         if not isinstance(values_dict, dict):
             raise ValueError(
                 "Invalid values ({}) for element {}"
-                    .format(values_dict, self.name))
+                .format(values_dict, self.name))
 
         # Check for duplicate keys.
         keys = defaultdict(lambda: [])
@@ -868,8 +884,8 @@ class _DictElem(ConfigElement):
                 raise KeyError(
                     "Invalid key '{}' in {} called {}. Key does not match "
                     "expected regular expression '{}'"
-                        .format(key_mod, self.__class__.__name__, self.name,
-                                self._NAME_RE.pattern))
+                    .format(key_mod, self.__class__.__name__, self.name,
+                            self._NAME_RE.pattern))
 
         for k_list in keys.values():
             if len(k_list) != 1:
@@ -936,7 +952,7 @@ class KeyedElem(_DictElem):
             raise ValueError(
                 "Could not find resolver for derived element '{}' in {} "
                 "called {}."
-                    .format(elem.name, self.__class__.__name__, self.name))
+                .format(elem.name, self.__class__.__name__, self.name))
 
     def find(self, dotted_key):
         if dotted_key == '':
@@ -950,8 +966,8 @@ class KeyedElem(_DictElem):
                     "Invalid dotted key for {} called '{}'. KeyedElem"
                     "element names must be in the defined keys. "
                     "Got '{}' from '{}', but valid keys are {}"
-                        .format(self.__class__.__name__, self.name,
-                                key, dotted_key, self.config_elems.keys()))
+                    .format(self.__class__.__name__, self.name,
+                            key, dotted_key, self.config_elems.keys()))
 
             return self.config_elems[key].find(next_key)
 
@@ -1017,12 +1033,18 @@ class KeyedElem(_DictElem):
 
         self._key_check(values)
 
-        if self._key_case is self.KC_LOWER:
-            given_keys = [k.lower() for k in values.keys()]
-        elif self._key_case is self.KC_UPPER:
-            given_keys = [k.upper() for k in values.keys()]
-        else:
-            given_keys = values.keys()
+        # Change the key case.
+        for key in values.keys():
+            if self._key_case is self.KC_LOWER:
+                new_key = key.lower()
+            elif self._key_case is self.KC_UPPER:
+                new_key = key.upper()
+            else:
+                continue
+
+            if key != new_key:
+                values[new_key] = values[key]
+                del values[key]
 
         derived_elements = []
 
@@ -1204,16 +1226,14 @@ class CategoryElem(_DictElem):
                     "Invalid dotted key for {} called '{}'. CategoryElem"
                     "must have their element name given as a *, since it's "
                     "sub-element isn't named. Got '{}' from '{}' instead."
-                        .format(self.__class__.__name__, self.name,
-                                key, dotted_key))
+                    .format(self.__class__.__name__, self.name,
+                            key, dotted_key))
 
             return self._sub_elem.find(next_key)
 
     def yaml_events(self, values, show_comments, show_choices,
                     comment_width=80):
-        """Create a mapping event list, based on the values given.
-        :param comment_width:
-        """
+        """Create a mapping event list, based on the values given."""
         if values is None:
             values = dict()
 
@@ -1230,7 +1250,8 @@ class CategoryElem(_DictElem):
             for key, value in values.items():
                 # Add the mapping key.
                 events.append(yaml.ScalarEvent(value=key, anchor=None,
-                                               tag=None, implicit=(True, True)))
+                                               tag=None,
+                                               implicit=(True, True)))
                 # Add the mapping value.
                 events.extend(
                     self._sub_elem.yaml_events(
@@ -1288,7 +1309,6 @@ class DefaultedCategoryElem(CategoryElem):
                                                         elements),
                                                     **kwargs)
 
-
     def validate(self, value_dict, partial=False):
         out_dict = self.result_dict_type()
 
@@ -1316,8 +1336,8 @@ class DefaultedCategoryElem(CategoryElem):
             # We know our sub-element is a dict in this case.
             value.update(base_value)
             validated_value = self._sub_elem.validate(value, partial)
-            # Merge the validated values with the defaults from the hard coded defaults
-            # if present.
+            # Merge the validated values with the defaults from the hard
+            # coded defaults if present.
             if key in out_dict:
                 out_dict[key] = self._sub_elem.merge(out_dict[key],
                                                      validated_value)

@@ -1,17 +1,19 @@
-"""YamlConfig is a set of utilities for strictly describing a YAML configuration file,
-loading it, and validating that the contents conform to the description. It is also
-capable of taking the description and automatically producing an example configuration
-in the specified format, complete with comments.
+"""yaml_config is a set of utilities for strictly describing a YAML
+configuration file, loading it, and validating that the contents conform to
+the description. It is also capable of taking the description and
+automatically producing an example configuration in the specified format,
+complete with comments.
 
-Configuration descriptions are built much like with Object Relational Mappers (ORMs)
-for databases. Unlike databases, YAML files are expected to have nested information
-that makes the typical ORM syntax unsuitable. Our solution does it's best to mimick
-ORM style where possible, while still allowing for deeply nested configs.
+Configuration descriptions are built much like with Object Relational
+Mappers (ORMs) for databases. Unlike databases, YAML files are expected to
+have nested information that makes the typical ORM syntax unsuitable. Our
+solution does it's best to mimick ORM style where possible, while still
+allowing for deeply nested configs.
 
 ## pyYAML
 This library uses an included, modified version of pyYAML capable of building
-YAML event sequences that include comments. It is limited to working in pure python
-mode only.
+YAML event sequences that include comments. It is limited to working in pure
+python mode only.
 
 # Basic Usage
 YamlConfigs consist of ConfigElement() instantiations attached to
@@ -22,15 +24,25 @@ just a strictly keyed dictionary ConfigElement with some extras.
 
     import yaml_config as yc
 
-    class BirthdayPartyConfig(yc.YamlConfig):
+    class BirthdayPartyConfig(yc.YamlConfigLoader):
         # A list of the valid ConfigElement keys for this config.
         ELEMENTS = [
-            # This defines a 'balloons' key, with a default of 0 that must be an int.
-            yc.IntElem('balloons', default=0, help_text='Number of balloons needed'),
-            # This defines a 'party_name' key, which can be any string, but is required.
-            yc.StrElem('party_name', required=True, help_text='What to call this party.'),
+            # This defines a 'balloons' key, with a default of 0 that must be
+            # an int.
+            yc.IntElem(
+                'balloons',
+                default=0,
+                help_text='Number of balloons needed'),
+            # This defines a 'party_name' key, which can be any string,
+            # but is required.
+            yc.StrElem(
+                'party_name',
+                required=True,
+                help_text='What to call this party.'),
             # Most types can be limited to specific choices or ranges.
-            yc.StrElem('cake', default='chocolate', choices=['chocolate', 'vanilla']),
+            yc.StrElem(
+                'cake',
+                default='chocolate', choices=['chocolate', 'vanilla']),
         ]
 
     # Instantiate the party class. This can be reused to parse multiple configs.
@@ -47,7 +59,8 @@ just a strictly keyed dictionary ConfigElement with some extras.
     balloons = party_data[balloons]
     name = party_data.name
 
-The above configuration description can also produce an actual configuration file:
+The above configuration description can also produce an actual
+configuration file:
 """
 
 

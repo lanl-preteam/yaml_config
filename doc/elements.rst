@@ -1,7 +1,7 @@
 Config Elements
 ===============
 
-The config specification in YamlConfig is essentially a tree of ConfigElement instances, where
+The config specification in Yaml Config is essentially a tree of ConfigElement instances, where
 ConfigElement is the base class of all element types in the tree.
 
 This page describes all the defined ConfigElement types. For information on creating custom
@@ -87,7 +87,7 @@ There are a couple of things to note:
  - Make sure siblings used in your post_validation should generally be *required* or have a
    *default*.
  - If a post-validator is found, it is expected to return the validated value.
- - In Keyed Elements and YamlConfigs, post-validators are executed in the order the elements were
+ - In Keyed Elements and Yaml Configs, post-validators are executed in the order the elements were
    listed in *ELEMENTS*.
  - For Lists and Category Elements/Configs, the order is undefined.
  - If validation fails in a post_validator, a ValueError is expected to be raised. That error's
@@ -111,7 +111,7 @@ Example: ::
 
         return value
 
-    class MyConfig(yc.YamlConfig):
+    class MyConfig(yc.YamlConfigLoader):
         ELEMENTS = [
             MultTenElem('by_tens', required=True),
             yc.IntElem('bigger', post_validator=bigger),

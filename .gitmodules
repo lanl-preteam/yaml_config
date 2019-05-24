@@ -1,0 +1,3 @@
+[submodule "lib/pyyaml"]
+	path = deps/pyyaml
+	url = git@github.com:pflarr/pyyaml.git
