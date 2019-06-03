@@ -407,6 +407,9 @@ class ConfigElement:
 
         return new
 
+    def __repr__(self):
+        return "<yaml_config {} {}>".format(self.__class__.__name__, self.name)
+
 
 class ScalarElem(ConfigElement):
     def __init__(self, name=None, **kwargs):
@@ -523,8 +526,8 @@ class RegexElem(StrElem):
         :param regex: A regular expression string to match against.
         """
 
-        super(RegexElem, self).__init__(name=name, choices=[regex], **kwargs)
         self.regex = re.compile(regex)
+        super(RegexElem, self).__init__(name=name, choices=[regex], **kwargs)
 
     def _check_range(self, value):
         if self.regex.match(value) is None:
