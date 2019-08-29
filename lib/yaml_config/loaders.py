@@ -99,9 +99,9 @@ class YamlConfigLoaderMixin:
 
         new_data = yaml.load(infile)
 
-        data = self.merge(base_data, new_data)
+        new_data = self.normalize(new_data)
 
-        data = self.normalize(data)
+        data = self.merge(base_data, new_data)
 
         return self.validate(data, partial=partial)
 

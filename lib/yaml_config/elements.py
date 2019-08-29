@@ -1148,7 +1148,7 @@ class CategoryElem(_DictElem):
                                            default=defaults, **kwargs)
 
     def normalize(self, values):
-        """Make sure values is a dict, and recursively validate the contained
+        """Make sure values is a dict, and recursively normalize the contained
         keys. Returns None if values is None.
         :param dict values:
         """
