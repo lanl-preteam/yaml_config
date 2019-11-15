@@ -33,29 +33,32 @@ class ConfigDict(dict):
     typechecking.
     @DynamicAttrs
     """
-
+    
     def __getattr__(self, key):
         if key in self:
-            return super(ConfigDict, self).__getitem__(key)
+            return super().__getitem__(key)
         else:
-            return super(ConfigDict, self).__getattribute__(key)
+            return super().__getattribute__(key)
 
     def __setattr__(self, key, value):
         if key in self:
-            super(ConfigDict, self).__setitem__(key, value)
+            super().__setitem__(key, value)
         else:
-            super(ConfigDict, self).__setattr__(key, value)
+            super().__setattr__(key, value)
+
+    def copy(self):
+        return ConfigDict(**self)
 
 
 class NullList(list):
     """A list with no extra attributes other than the fact that it is a
-    disctinct class from 'list'. We'll use this to tell the difference
+    distinct class from 'list'. We'll use this to tell the difference
     between an empty list and a list that implicitly defined."""
 
     def copy(self):
         """When we copy this list, make sure it returns another NullList. The
         base list class probably should have probably done it this way."""
-        return NullList(self)
+        return self.__class__(self)
 
 
 # Tell yaml how to represent a ConfigDict (as a dictionary).
@@ -100,7 +103,8 @@ class ConfigElement:
     def __init__(self, name=None, default=None, required=False, hidden=False,
                  _sub_elem=None, choices=None, post_validator=None,
                  help_text=""):
-        """
+        """Most ConfigElement child classes take all of these arguments, and
+        just add a few of their own.
         :param str name: The name of this configuration element. Required if
             this is a key in a KeyedElem. Will receive a descriptive default
             otherwise.
@@ -968,7 +972,7 @@ class KeyedElem(_DictElem):
             next_key = parts[1] if len(parts) == 2 else ''
             if key not in self.config_elems:
                 raise KeyError(
-                    "Invalid dotted key for {} called '{}'. KeyedElem"
+                    "Invalid dotted key for {} called '{}'. KeyedElem "
                     "element names must be in the defined keys. "
                     "Got '{}' from '{}', but valid keys are {}"
                     .format(self.__class__.__name__, self.name,
