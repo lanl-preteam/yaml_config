@@ -884,7 +884,7 @@ class _DictElem(ConfigElement):
             if self._key_case is self.KC_LOWER:
                 key_mod = key.lower()
             elif self._key_case is self.KC_UPPER:
-                key_mod = key.lower()
+                key_mod = key.upper()
             else:
                 key_mod = key
             keys[key_mod].append(key)
@@ -1044,9 +1044,9 @@ class KeyedElem(_DictElem):
 
         # Change the key case.
         for key in values.keys():
-            if self._key_case is self.KC_LOWER:
+            if self._key_case == self.KC_LOWER:
                 new_key = key.lower()
-            elif self._key_case is self.KC_UPPER:
+            elif self._key_case == self.KC_UPPER:
                 new_key = key.upper()
             else:
                 continue
@@ -1188,8 +1188,20 @@ class CategoryElem(_DictElem):
             for key, value in self._default:
                 out_dict[key] = value
 
+        # Change the key case.
+        for key in value_dict.keys():
+            if self._key_case == self.KC_LOWER:
+                new_key = key.lower()
+            elif self._key_case == self.KC_UPPER:
+                new_key = key.upper()
+            else:
+                continue
+
+            if key != new_key:
+                value_dict[new_key] = value_dict[key]
+                del value_dict[key]
+
         for key, value in value_dict.items():
-            key = key.lower()
             if self._choices is not None and key not in self._choices:
                 raise ValueError(
                     "Invalid key for {} called {}. '{}' not in given choices.")
