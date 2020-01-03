@@ -265,8 +265,8 @@ class Emitter:
             if isinstance(self.event, ScalarEvent):
                 self.expect_scalar()
             elif isinstance(self.event, SequenceStartEvent):
-                if self.flow_level or self.canonical or self.event.flow_style \
-                    or self.check_empty_sequence():
+                if (self.flow_level or self.canonical or self.event.flow_style
+                        or self.check_empty_sequence()):
                     self.expect_flow_sequence()
                 else:
                     self.expect_block_sequence()

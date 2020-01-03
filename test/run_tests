@@ -58,7 +58,8 @@ def main():
 
         if result.errors or result.failures:
             return -1
-    elif not args.yaml_config_only:
+
+    if not args.yaml_config_only:
         yaml_tests_args = []
         if args.verbose:
             yaml_tests_args.append('-v')
@@ -66,7 +67,8 @@ def main():
         # Run the yaml tests.
         if not test_all.main(args=yaml_tests_args):
             return -1
-    else:
+    
+    if args.yaml_config_only and args.yaml_only:
         print("No tests were selected.")
         return -1
     
