@@ -79,8 +79,7 @@ class FormatTest(YCTestCase):
 
         test = self.Config()
         test_file = self.DATA_DIR/'test1.yaml'
-        print(test_file.as_posix(), test_file.exists())
-        with open(self.DATA_DIR/'test1.yaml', 'r') as f:
+        with test_file.open('r') as f:
             data = test.load(f)
 
         buffer = StringIO()
