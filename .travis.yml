@@ -7,5 +7,6 @@ before_install:
     - sudo apt-get install -y pylint3 python3-sphinx
 
 script: 
+    - make
     - ./test/run_tests
 
