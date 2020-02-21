@@ -52,4 +52,5 @@ just a strictly keyed dictionary ConfigElement with some extras.
 The above configuration description can also produce an actual configuration file:
 
 ## Further Documentation
-  
+
+[Read the Docs](https://yaml-config.readthedocs.io/en/latest/)
