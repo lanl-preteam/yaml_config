@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+import logging
+import os
+import sys
+import unittest
+import argparse
+from pathlib import Path
+from testlib import ColorResult, YCTestCase
+
+this_file = Path(__file__).resolve()
+lib_dir = this_file.parents[1]/'lib'
+tests_dir = this_file.parent/'tests'
+
+# Setup our paths to the pavilion libraries.
+sys.path.append(str(lib_dir))
+# We also need to find our yaml_tests library.
+sys.path.append(str(this_file.parent))
+
+from yaml_tests import test_all
+
+def main():
+    parser = argparse.ArgumentParser(
+        usage="This runs all the tests in the tests/ directory. For a python " 
+              "file to be recognized as a test suite, it must end in "
+              "'_tests.py'. All other files are ignored")
+
+    parser.add_argument('-s', '--skip', action='append', default=[],
+                        help="Skip tests matching the given glob pattern. The "
+                             "'test_' prefix is removed from the name for this "
+                             "check.")
+    parser.add_argument('-o', '--only', action='append', default=[],
+                        help="Only run tests matching the given glob pattern. "
+                             "The 'test_' prefix is removed from the name "
+                             "for this check.")
+    parser.add_argument('-y', '--yaml-only', action='store_true', default=False,
+                        help="Only run the yaml tests.")
+    parser.add_argument('-c', '--yaml-config-only', action='store_true', default=False,
+                        help="Only run the yaml config tests.")
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help="Print all log output to stderr.")
+    args = parser.parse_args(sys.argv[1:])
+
+    if args.skip:
+        YCTestCase.set_skip(args.skip)
+    if args.only:
+        YCTestCase.set_only(args.only)
+
+    loader = unittest.TestLoader()
+    suite = loader.discover(tests_dir.as_posix(), pattern='*_tests.py')
+    runner = unittest.TextTestRunner(
+        resultclass=ColorResult,
+        verbosity=2)
+
+    if not args.yaml_only:
+        # Run the yaml_config tests
+        result = runner.run(suite)
+
+        if result.errors or result.failures:
+            return -1
+
+    if not args.yaml_config_only:
+        yaml_tests_args = []
+        if args.verbose:
+            yaml_tests_args.append('-v')
+
+        # Run the yaml tests.
+        if not test_all.main(args=yaml_tests_args):
+            return -1
+    
+    if args.yaml_config_only and args.yaml_only:
+        print("No tests were selected.")
+        return -1
+    
+if __name__ == '__main__':
+    sys.exit(main())

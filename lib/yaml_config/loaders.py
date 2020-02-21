@@ -1,8 +1,7 @@
-from . elements import KeyedElem, CategoryElem, ListElem, ConfigDict
-
 from abc import ABCMeta, abstractmethod
 
 import yc_yaml as yaml
+from .structures import ListElem, KeyedElem, CategoryElem
 
 
 class YamlConfigLoaderMixin:
@@ -25,7 +24,8 @@ class YamlConfigLoaderMixin:
     # This is expected to be overridden by the main class.
     type = None
 
-    def dump(self, outfile, values=None, show_comments=True, show_choices=True):
+    def dump(self, outfile, values=None,
+             show_comments=True, show_choices=True):
         """Write the configuration to the given output stream.
 
         :param stream outfile: A writable stream object
@@ -33,7 +33,8 @@ class YamlConfigLoaderMixin:
             inserted. Values should be a dictionary as produced by
             YamlConfigLoader.load().
         :param bool show_comments: When dumping the config file, include
-            help_text and general element information as comments. Default True.
+            help_text and general element information as comments.
+            Default True.
         :param bool show_choices: When creating comments, include the
             choices available for each item. Default True.
         """
@@ -76,23 +77,26 @@ class YamlConfigLoaderMixin:
         return yaml.load(infile)
 
     def load_empty(self, partial=True):
-        """Get a copy of the configuration, as if we had loaded an empty file. Essentially,
-        get a configuration with just the defaults.
+        """Get a copy of the configuration, as if we had loaded an empty file.
+        Essentially, get a configuration with just the defaults.
 
         :param bool partial: The config is not expected to be complete.
-        :returns ConfigDict: A ConfigDict of the contents of the configuration file.
+        :returns ConfigDict: A ConfigDict of the contents of the configuration
+            file.
         :raises ValueError, RequiredError, KeyError: As per validate().
         """
 
         return self.validate(self.type(), partial=partial)
 
     def load_merge(self, base_data, infile, partial=False):
-        """Load the data infile, merge it into base_data, and then validate the combined result.
+        """Load the data infile, merge it into base_data, and then validate the
+            combined result.
         :param base_data: Existing data to merge new data into.
         :param file infile: The input file object.
         :param bool partial: The infile is not expected to be a complete
         configuration, so missing 'required' fields can be ignored.
-        :returns ConfigDict: A ConfigDict of the contents of the configuration file.
+        :returns ConfigDict: A ConfigDict of the contents of the configuration
+            file.
         :raises IOError: On stream read failures.
         :raises YAMLError: (and child exceptions) On YAML format issues.
         """
@@ -135,13 +139,15 @@ class YamlConfigLoaderMixin:
         return dotted_key
 
     def set_default(self, dotted_key, value):
-        """Sets the default value of the element found using dotted_key path. See '
-        the structure of the elements relative to this one, which is typically the base
-        ConfigElement instance. Each component of the dotted key must correspond to a named key
-        at that level. In cases such as lists where then sub_elem doesn't have a name,
-        a '*' should be given.
+        """Sets the default value of the element found using dotted_key path.
+        See the structure of the elements relative to this one, which is
+        typically the base ConfigElement instance. Each component of the
+        dotted key must correspond to a named key at that level. In cases
+        such as lists where then sub_elem doesn't have a name, a '*' should
+        be given.
 
-        Why ever use this? Because in many cases the default is based on run-time information.
+        Why ever use this? Because in many cases the default is based on
+        run-time information.
 
         Examples: ::
 
@@ -154,7 +160,8 @@ class YamlConfigLoaderMixin:
 
             config = DessertConfig()
 
-            # Set the 'fruit' element of the 'pie' element to have a default of 'apple'.
+            # Set the 'fruit' element of the 'pie' element to have a
+            # default of 'apple'.
             config.set_default('pie.fruit', 'apple')
 
             class Config2(yc.YamlConfigLoader):
@@ -167,12 +174,14 @@ class YamlConfigLoaderMixin:
 
                 def __init__(self, default_color):
                     # The Config init is a good place to do this.
-                    # Set all the default color for all cars in the 'cars' list to red.
+                    # Set all the default color for all cars in the 'cars'
+                    # list to red.
                     config.set_default('cars.*.color', 'red')
 
                     super(self, Config2).__init__()
 
-        :param str dotted_key: The dotted key path to the element to set the default on.
+        :param str dotted_key: The dotted key path to the element to set
+            the default on.
         :param value: The value to set the default to. This validated.
         :raises ValueError: If the default fails validation.
         :return: None
@@ -184,11 +193,11 @@ class YamlConfigLoaderMixin:
 
 
 class YamlConfigLoader(KeyedElem, YamlConfigLoaderMixin):
-    """Defines a YAML config specification, where the base structure is a strictly keyed
-    dictionary.
+    """Defines a YAML config specification, where the base structure is a
+    strictly keyed dictionary.
 
-    To use this, subclass it and override the ELEMENTS class variable with a list
-    of ConfigElement instances that describe the keys for config. ::
+    To use this, subclass it and override the ELEMENTS class variable with a
+    list of ConfigElement instances that describe the keys for config. ::
 
         import yaml_config as yc
 
@@ -206,16 +215,18 @@ class YamlConfigLoader(KeyedElem, YamlConfigLoaderMixin):
         last_name: Sagat
         age: 59
 
-    :cvar [str] HEADER: The documentation that should appear at the top of the config file.
-    :cvar [ConfigElement] ELEMENTS: Override this with a list of element types describing your
-        configuration.
+    :cvar [str] HEADER: The documentation that should appear at the top of the
+        config file.
+    :cvar [ConfigElement] ELEMENTS: Override this with a list of element
+        types describing your configuration.
     """
 
     ELEMENTS = []
 
     def __init__(self):
         """Initialize the config."""
-        super(YamlConfigLoader, self).__init__(elements=self.ELEMENTS, help_text=self.HEADER)
+        super(YamlConfigLoader, self).__init__(
+            elements=self.ELEMENTS, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
         self.name = '<root>'
 
