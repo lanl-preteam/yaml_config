@@ -12,6 +12,10 @@ class DocTest(YCTestCase):
         # Make sure the doc directory actually exists.
         self.assertTrue(self.DOC_DIR.exists())
 
+        print(self.DOC_DIR.as_posix(), self.DOC_DIR.exists())
+        import os
+        print('cwd', os.getcwd())
+
         subprocess.call(
             ['make', 'clean'],
             cwd=self.DOC_DIR.as_posix(),
