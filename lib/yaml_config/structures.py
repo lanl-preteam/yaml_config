@@ -172,7 +172,7 @@ class ListElem(ConfigElement):
             events.append(yaml.CommentEvent(value=comment))
 
         if not value:
-            value = self._sub_elem.type()
+            value = self.type()
 
         # Value is expected to be a list of items at this point.
         for val in value:
