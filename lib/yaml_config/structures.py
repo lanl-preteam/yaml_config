@@ -84,7 +84,7 @@ class ListElem(ConfigElement):
         empty. Single values, however, become a list of that value. All
         contained value are recursively normalized."""
 
-        if value is None:
+        if value is None or value == [None]:
             return None
         elif isinstance(value, self.type):
             return [self._sub_elem.normalize(v) for v in value]
