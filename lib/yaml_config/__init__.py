@@ -78,15 +78,16 @@ from .loaders import (
     YamlConfigLoaderMixin,
 )
 from .scalars import (
-    ScalarElem,
     BoolElem,
-    RangeElem,
-    IntElem,
     FloatElem,
-    IntRangeElem,
     FloatRangeElem,
-    StrElem,
+    IntElem,
+    IntRangeElem,
+    PathElem,
+    RangeElem,
     RegexElem,
+    ScalarElem,
+    StrElem,
 )
 from .structures import (
     ListElem,
