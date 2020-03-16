@@ -170,7 +170,7 @@ class ConfigElement:
         # The default value gets validated through a setter function.
         self._default = None
         if default is not None:
-            self.default = default
+            self.default = self.normalize(default)
 
     def _set_sub_elem_names(self):
         """Names are optional for sub-elements. If one isn't given,

@@ -507,7 +507,8 @@ class CategoryElem(_DictElem):
         :param Union(None,list) choices: The possible keys for this element.
         None denotes that any are valid.
         :param bool required: Whether this element is required.
-        :param dict defaults: An optional dictionary of default key:value pairs.
+        :param Union[dict,None] defaults: An optional dictionary of default
+        key:value pairs.
         :param str key_case: Must be one of the <cls>.KC_* values. Determines
         whether keys are automatically converted to lower or upper case,
         or left alone.

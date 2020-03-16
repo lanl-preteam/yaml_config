@@ -131,6 +131,12 @@ class BaseConstructor:
                 raise ConstructorError("while constructing a mapping", node.start_mark,
                         "found unhashable key", key_node.start_mark)
             value = self.construct_object(value_node, deep=deep)
+
+            if key in mapping:
+                raise ConstructorError(
+                    "While constructing a mapping", node.start_mark,
+                    "found duplicate key", key_node.start_mark)
+
             mapping[key] = value
         return mapping
 

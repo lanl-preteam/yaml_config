@@ -107,6 +107,18 @@ class StrElem(ScalarElem):
     """A basic string element."""
     type = str
 
+    @staticmethod
+    def type_converter(value):
+
+        if isinstance(value, (str, int, bool, float)):
+            return str(value)
+
+        raise ValueError(
+            "Expected a string (or something trivially convertable to a "
+            "string). Got a '{}' with value '{}'"
+            .format(type(value), value)
+        )
+
 
 class PathElem(ScalarElem):
     """An element that always expects a filesystem path."""
@@ -125,6 +137,7 @@ class RegexElem(StrElem):
         super(RegexElem, self).__init__(name=name, choices=[regex], **kwargs)
 
     def _check_range(self, value):
+
         if self.regex.match(value) is None:
             raise ValueError(
                 "Value {} does not match regex '{}' for {} called '{}'".format(
