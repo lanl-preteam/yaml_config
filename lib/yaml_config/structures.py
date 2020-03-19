@@ -434,6 +434,15 @@ class KeyedElem(_DictElem):
                 value[new_key] = value[key]
                 del value[key]
 
+        # Make sure each key is defined in the KeyedElement
+        for key in value:
+            if key not in self.config_elems:
+                raise KeyError(
+                    "Key '{}' under KeyedElem '{}' does not appear in the "
+                    "elements list."
+                    .format(key, self.name)
+                )
+
         derived_elements = []
 
         for key, elem in self.config_elems.items():

@@ -70,3 +70,14 @@ class BasicTest(YCTestCase):
 
         yaml_config.scalars.RegexElem(
             'num', default=5, regex=r'\d+')
+
+    def test_extra_keyedelem_key(self):
+        """KeyedElements should not allow for keys that aren't defined in
+        their element list."""
+
+        with self.assertRaises(KeyError):
+            self.Config().validate(
+                {
+                    'not_defined': 'nope',
+                }
+            )
