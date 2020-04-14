@@ -21,3 +21,6 @@ properties:
   # LEGS(required int)
   # Valid Range: > 0
   legs: 4
+traits:
+    int: 'low'
+    agility: 'terrible'

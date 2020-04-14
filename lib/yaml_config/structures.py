@@ -364,6 +364,10 @@ class KeyedElem(_DictElem):
     def merge(self, old, new):
 
         base = old.copy()
+
+        if new is None:
+            return base
+
         for key, value in new.items():
             base[key] = self.config_elems[key].merge(old[key], new[key])
 
@@ -615,6 +619,10 @@ class CategoryElem(_DictElem):
 
     def merge(self, old, new):
         base = old.copy()
+
+        if new is None:
+            return base
+
         for key, value in new.items():
             if key in old:
                 base[key] = self._sub_elem.merge(old[key], new[key])

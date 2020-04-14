@@ -18,6 +18,8 @@ class FormatTest(YCTestCase):
                                             help_text="The kind of pet."),
                 yaml_config.scalars.IntElem("quantity", required=True, choices=[1, 2, 3]),
                 yaml_config.scalars.FloatRangeElem("quality", vmin=0, vmax=1.0),
+                yaml_config.structures.CategoryElem(
+                    "traits", sub_elem=yaml_config.scalars.StrElem()),
                 yaml_config.structures.ListElem(
                     name='complex',
                     sub_elem=yaml_config.structures.CategoryElem(

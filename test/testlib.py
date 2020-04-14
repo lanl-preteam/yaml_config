@@ -5,6 +5,7 @@ import inspect
 import types
 import unittest
 import fnmatch
+import yaml_config
 
 
 class YCTestCase(unittest.TestCase):
@@ -17,6 +18,34 @@ class YCTestCase(unittest.TestCase):
 
     DATA_DIR = Path(__file__).parent/'tests'/'data'
     ROOT_DIR = Path(__file__).parents[1]
+
+    class Config(yaml_config.YamlConfigLoader):
+        """A basic config to run tests against."""
+
+        ELEMENTS = [
+            yaml_config.scalars.StrElem(
+                "pet", default="squirrel", required=True,
+                choices=["squirrel", "cat", "dog"],
+                help_text="The kind of pet."),
+            yaml_config.scalars.IntElem("quantity", required=True,
+                                        choices=[1, 2, 3]),
+            yaml_config.scalars.FloatRangeElem("quality", vmin=0, vmax=1.0),
+            yaml_config.structures.ListElem(
+                "potential_names",
+                help_text="What you could name this pet.",
+                sub_elem=yaml_config.scalars.StrElem(help_text="Such as Fido.")),
+            yaml_config.structures.KeyedElem(
+                "properties", help_text="Pet properties", elements=[
+                yaml_config.scalars.StrElem(
+                    "description", help_text="General pet description."),
+                yaml_config.scalars.RegexElem(
+                    "greeting", regex=r'hello \w+$',
+                    help_text="A regex of some sort."),
+                yaml_config.scalars.IntRangeElem("legs", vmin=0)
+            ]),
+            yaml_config.structures.CategoryElem(
+                "traits", sub_elem=yaml_config.scalars.StrElem()),
+        ]
 
     def __getattribute__(self, item):
         """When the unittest framework wants a test, check if the test

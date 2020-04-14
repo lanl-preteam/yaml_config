@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
-import logging
-import os
+import argparse
 import sys
 import unittest
-import argparse
 from pathlib import Path
-from testlib import ColorResult, YCTestCase
 
 this_file = Path(__file__).resolve()
 lib_dir = this_file.parents[1]/'lib'
@@ -17,7 +14,9 @@ sys.path.append(str(lib_dir))
 # We also need to find our yaml_tests library.
 sys.path.append(str(this_file.parent))
 
+from testlib import ColorResult, YCTestCase
 from yaml_tests import test_all
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -67,10 +66,10 @@ def main():
         # Run the yaml tests.
         if not test_all.main(args=yaml_tests_args):
             return -1
-    
+
     if args.yaml_config_only and args.yaml_only:
         print("No tests were selected.")
         return -1
-    
+
 if __name__ == '__main__':
     sys.exit(main())
