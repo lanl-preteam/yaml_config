@@ -175,8 +175,9 @@ class CanonicalScanner:
                     self.index += length
                 else:
                     if ch not in self.QUOTE_REPLACES:
-                        raise CanonicalError("invalid escape code")
-                    chunks.append(self.QUOTE_REPLACES[ch])
+                        chunks.append('\\' + ch)
+                    else:
+                        chunks.append(self.QUOTE_REPLACES[ch])
                 start = self.index
             elif self.data[self.index] == '\n':
                 chunks.append(self.data[start:self.index])

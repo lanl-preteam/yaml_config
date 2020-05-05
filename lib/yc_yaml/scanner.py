@@ -1216,8 +1216,7 @@ class Scanner:
                     self.scan_line_break()
                     chunks.extend(self.scan_flow_scalar_breaks(double, start_mark))
                 else:
-                    raise ScannerError("while scanning a double-quoted scalar", start_mark,
-                            "found unknown escape character %r" % ch, self.get_mark())
+                    chunks.extend('\\')
             else:
                 return chunks
 
