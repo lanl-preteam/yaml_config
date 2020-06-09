@@ -6,7 +6,7 @@ __all__ = ['BaseRepresenter', 'SafeRepresenter', 'Representer',
 from .error import *
 from .nodes import *
 
-import datetime, sys, types, base64, collections
+import datetime, sys, types, base64, collections, pathlib
 
 if sys.version_info[0] == 2:
     import copy_reg as copyreg
@@ -273,6 +273,14 @@ SafeRepresenter.add_representer(datetime.datetime,
 
 SafeRepresenter.add_representer(None,
         SafeRepresenter.represent_undefined)
+
+# Added by yaml_config
+SafeRepresenter.add_multi_representer(
+    pathlib.Path,
+    lambda s, d: representer.SafeRepresenter.represent_str(s, str(d)))
+
+SafeRepresenter.add_representer(collections.OrderedDict,
+        SafeRepresenter.represent_dict)
 
 class Representer(SafeRepresenter):
 

@@ -62,9 +62,6 @@ class NullList(list):
 representer.SafeRepresenter.add_representer(
     ConfigDict,
     representer.SafeRepresenter.represent_dict)
-representer.SafeRepresenter.add_multi_representer(
-    pathlib.Path,
-    lambda s, d: representer.SafeRepresenter.represent_str(s, str(d)))
 
 
 # This is a dummy for type analyzers
