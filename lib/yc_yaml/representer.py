@@ -277,7 +277,7 @@ SafeRepresenter.add_representer(None,
 # Added by yaml_config
 SafeRepresenter.add_multi_representer(
     pathlib.Path,
-    lambda s, d: representer.SafeRepresenter.represent_str(s, str(d)))
+    lambda s, d: SafeRepresenter.represent_str(s, str(d)))
 
 SafeRepresenter.add_representer(collections.OrderedDict,
         SafeRepresenter.represent_dict)
