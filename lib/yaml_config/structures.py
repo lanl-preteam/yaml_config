@@ -369,7 +369,8 @@ class KeyedElem(_DictElem):
             return base
 
         for key, value in new.items():
-            base[key] = self.config_elems[key].merge(old[key], new[key])
+            if value is not None:
+                base[key] = self.config_elems[key].merge(old[key], new[key])
 
         return base
 
