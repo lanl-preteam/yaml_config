@@ -583,7 +583,7 @@ class CategoryElem(_DictElem):
                 out_dict[key] = val
 
         # Change the key case.
-        for key in value_dict.keys():
+        for key in list(value_dict.keys()):
             if self._key_case == self.KC_LOWER:
                 new_key = key.lower()
             elif self._key_case == self.KC_UPPER:
