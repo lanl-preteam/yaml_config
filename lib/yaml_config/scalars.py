@@ -73,13 +73,13 @@ class RangeElem(ScalarElem):
             return 'Valid Range: {} - {}'.format(*self._choices)
 
     def _check_range(self, value):
-        if self._choices[0] is not None and value >= self._choices[0]:
+        if self._choices[0] is not None and value < self._choices[0]:
             raise ValueError("Value {} in {} below minimum ({}).".format(
                 value,
                 self.name,
                 self._choices[0]
             ))
-        if self._choices[1] is not None and value <= self._choices[1]:
+        if self._choices[1] is not None and value > self._choices[1]:
             raise ValueError("Value {} in {} above maximum ({}).".format(
                 value,
                 self.name,
