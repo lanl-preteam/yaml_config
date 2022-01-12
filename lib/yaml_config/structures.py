@@ -396,10 +396,16 @@ class KeyedElem(_DictElem):
         for key, val in value.items():
             elem = self.config_elems.get(key, None)
             if elem is None:
-                raise TypeError(
-                    "Invalid config key '{}' given under {} called '{}."
-                    .format(key, self.__class__.__name__, self.name)
-                )
+                name = self.name
+                if name is not None:
+                    raise TypeError(
+                        "Invalid config key '{}' given under {} called '{}'."
+                        .format(key, self.__class__.__name__, self.name)
+                    )
+                else:
+                    raise TypeError(
+                        "Invalid config key '{}' given under root element.".format(key)
+                        )
 
             ndict[key] = elem.normalize(val)
 
