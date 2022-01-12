@@ -223,12 +223,12 @@ class YamlConfigLoader(KeyedElem, YamlConfigLoaderMixin):
 
     ELEMENTS = []
 
-    def __init__(self):
+    def __init__(self, name='<root>'):
         """Initialize the config."""
         super(YamlConfigLoader, self).__init__(
             elements=self.ELEMENTS, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
-        self.name = '<root>'
+        self.name = name
 
 
 class CatYamlConfigLoader(CategoryElem, YamlConfigLoaderMixin):
@@ -270,11 +270,11 @@ class CatYamlConfigLoader(CategoryElem, YamlConfigLoaderMixin):
 
     BASE = None
 
-    def __init__(self):
+    def __init__(self, name='<root>'):
         super(CatYamlConfigLoader, self).__init__(
             sub_elem=self.BASE, help_text=self.HEADER)
         # The name checking in __init__ will reject this name if set normally.
-        self.name = '<root>'
+        self.name = name
 
 
 class ListYamlConfigLoader(ListElem, YamlConfigLoaderMixin):
@@ -305,7 +305,7 @@ class ListYamlConfigLoader(ListElem, YamlConfigLoaderMixin):
 
     BASE = None
 
-    def __init__(self):
+    def __init__(self, name='<root>'):
         super(ListYamlConfigLoader, self).__init__(
             sub_elem=self.BASE, help_text=self.HEADER)
-        self.name = '<root>'
+        self.name = name
