@@ -238,10 +238,13 @@ class _DictElem(ConfigElement):
         :param {} values_dict: The dictionary to check.
         """
 
-        if not isinstance(values_dict, dict):
-            raise ValueError(
-                "Invalid values ({}) for element {}"
-                .format(values_dict, self.name))
+        if not isinstance(values_dict, self.type):
+            try:
+                values_dict = self.type(values_dict)
+            except (ValueError, KeyError):
+                raise ValueError(
+                    "Invalid values ({}) for element {}. Expected '{}'"
+                    .format(values_dict, self.name, self.type))
 
         # Check for duplicate keys.
         keys = defaultdict(lambda: [])
@@ -404,8 +407,8 @@ class KeyedElem(_DictElem):
                     )
                 else:
                     raise TypeError(
-                        "Invalid config key '{}' given under root element.".format(key)
-                        )
+                        "Invalid config key '{}' given under root "
+                        "element.".format(key))
 
             ndict[key] = elem.normalize(val)
 
