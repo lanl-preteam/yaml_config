@@ -204,7 +204,7 @@ class ListElem(ConfigElement):
 
 
 class _DictElem(ConfigElement):
-    result_dict_type = ConfigDict
+    type = ConfigDict
 
     KC_LOWER = 'lower'
     KC_UPPER = 'upper'
@@ -736,7 +736,7 @@ class DefaultedCategoryElem(CategoryElem):
     def validate(self, value, partial=False):
         value_dict = value
 
-        out_dict = self.result_dict_type()
+        out_dict = self.type()
 
         # Make sure the keys are sane
         self._key_check(value_dict)
